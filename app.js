@@ -940,7 +940,11 @@ alert(cube.asString());
 
 alert(cubeString === cube.asString());
 
+console.time("solve");
+
 const solution = cube.solve(22);
+
+console.timeEnd("solve");
 
 alert("Solver finished");
 
