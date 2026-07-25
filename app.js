@@ -940,8 +940,23 @@ alert(cube.asString());
 
 alert(cubeString === cube.asString());
 
-alert("Verify = " + cube.verify());
-console.log("Verify =", cube.verify());
+for (let i = 0; i < 54; i++) {
+
+    if (cubeString[i] !== cube.asString()[i]) {
+
+        alert(
+            "Mismatch at " + i +
+            "\nInput : " + cubeString[i] +
+            "\nCube  : " + cube.asString()[i]
+        );
+
+        break;
+
+    }
+
+}
+
+alert("Compare Finished");
 
 const testCube = new Cube();
 
