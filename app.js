@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+//import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
@@ -624,7 +624,7 @@ scene.add(directionalLight);
 /* ==========================================
    Orbit Controls
 ========================================== */
-
+/*
 const controls = new OrbitControls(
     camera,
     renderer.domElement
@@ -640,7 +640,7 @@ controls.enableZoom = false;
 controls.enablePan = false;
 
 camera.position.set(0,0,8);
-camera.lookAt(0,0,0);
+camera.lookAt(0,0,0);*/
 
 
 /* ==========================================
@@ -981,6 +981,3 @@ window.addEventListener(
 
     }
 );
-
-
-
