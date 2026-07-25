@@ -931,6 +931,8 @@ previousFaceBtn.addEventListener("click", () => {
 async function solveCube(cubeState) {
 
     alert("Solve button clicked");
+    
+    alert(JSON.stringify(cubeState, null, 2));
 
     const cubeString = getCubeString();
 
