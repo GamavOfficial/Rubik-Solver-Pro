@@ -781,6 +781,11 @@ const previousColor = cubie.userData.painted[faceIndex];
 
 const faceLetter = ["R","L","U","D","F","B"][faceIndex];
 
+alert(
+    "faceIndex = " + faceIndex +
+    "\nfaceLetter = " + faceLetter
+);
+
 const x = cubie.userData.x;
 const y = cubie.userData.y;
 const z = cubie.userData.z;
