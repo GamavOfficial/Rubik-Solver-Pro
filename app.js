@@ -832,6 +832,12 @@ alert(
 
 cubeState[faceLetter][stickerIndex] =
     COLOR_TO_FACE[appState.selectedColor];
+    
+    alert(
+    faceLetter +
+    " = " +
+    cubeState[faceLetter].join("")
+);
 
 updateFilledCounter();
 updateValidateButton();
