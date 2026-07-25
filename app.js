@@ -942,7 +942,7 @@ alert(cubeString === cube.asString());
 
 console.time("solve");
 
-const solution = cube.solve(22);
+const solution = cube.solve();
 
 console.timeEnd("solve");
 
