@@ -822,6 +822,14 @@ cubie.material[faceIndex].color.setHex(
 
 const stickerIndex = getStickerIndex(cubie, faceLetter);
 
+alert(
+    "Face = " + faceLetter +
+    "\nX = " + x +
+    "\nY = " + y +
+    "\nZ = " + z +
+    "\nIndex = " + stickerIndex
+);
+
 cubeState[faceLetter][stickerIndex] =
     COLOR_TO_FACE[appState.selectedColor];
 
