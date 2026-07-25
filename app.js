@@ -966,7 +966,7 @@ for (let i = 0; i < 54; i++) {
             "\nCube  : " + cube.asString()[i]
         );
 
-        break;
+        //break;
 
     }
 
