@@ -940,6 +940,16 @@ alert(cube.asString());
 
 alert(cubeString === cube.asString());
 
+const testCube = new Cube();
+
+testCube.randomize();
+
+alert("Testing solver...");
+
+const testSolution = testCube.solve();
+
+alert(testSolution);
+
 console.time("solve");
 
 const solution = cube.solve();
