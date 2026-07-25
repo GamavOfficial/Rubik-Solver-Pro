@@ -946,6 +946,8 @@ alert("Solver finished");
 
 alert(solution);
 
+console.log(solution);
+
     } catch (e) {
 
         alert(e.message);
