@@ -726,6 +726,8 @@ rubiksCube.add(cubie);
 
 scene.add(rubiksCube);
 
+alert("Cubies: " + rubiksCube.children.length);
+
 rubiksCube.position.set(0, 0, 0);
 
 const cubeRotation = new CubeRotation(rubiksCube);
@@ -832,7 +834,14 @@ showToast(appState.selectedColor + " Applied");
    Animation Loop
 ========================================== */
 
+let firstFrame = true;
+
 function animate() {
+
+    if (firstFrame) {
+        alert("Animate Started");
+        firstFrame = false;
+    }
 
     requestAnimationFrame(animate);
 
