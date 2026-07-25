@@ -601,6 +601,9 @@ renderer.setSize(
 
 viewer.appendChild(renderer.domElement);
 
+camera.position.set(0, 0, 8);
+camera.lookAt(0, 0, 0);
+
 /* ==========================================
    Lights
 ========================================== */
