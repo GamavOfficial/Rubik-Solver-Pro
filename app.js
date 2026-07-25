@@ -940,6 +940,9 @@ alert(cube.asString());
 
 alert(cubeString === cube.asString());
 
+alert("Verify = " + cube.verify());
+console.log("Verify =", cube.verify());
+
 const testCube = new Cube();
 
 testCube.randomize();
