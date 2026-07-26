@@ -922,15 +922,13 @@ async function solveCube(cubeState) {
 
 alert(cube.isSolved());
 
-console.time("solve");
+alert("Before solve");
 
 const solution = cube.solve();
 
-console.timeEnd("solve");
+alert("After solve");
 
 alert(solution);
-
-console.log(solution);
 
     } catch (e) {
 
