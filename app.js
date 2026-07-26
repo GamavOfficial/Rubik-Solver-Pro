@@ -948,6 +948,12 @@ async function solveCube(cubeState) {
     const cubeString = getCubeString();
 
     alert(cubeString);
+    
+    const order = ["U", "R", "F", "D", "L", "B"];
+
+for (const face of order) {
+    alert(face + " = " + cubeState[face].join(""));
+}
 
     try {
 
