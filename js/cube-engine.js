@@ -175,9 +175,19 @@ this.faceDirection = {
 
 this.activeColor = null;
 
+this.colorToFaceLetter = {
+    "U": "U",
+    "R": "R",
+    "F": "F",
+    "D": "D",
+    "L": "L",
+    "B": "B"
+};
+
     // --------------------------------------------------  
     // Execution Performance Bindings  
     // --------------------------------------------------  
+
     this.resizeHandler = this.onResize.bind(this);  
     
     this.pointerDownHandler = this.onPointerDown.bind(this);
@@ -892,4 +902,83 @@ return this.stickers.filter(s => s.userData && s.userData.color).length;
 
 }
 
-                    }
+// =====================================================
+// Part 5
+// Kociemba Solver Input Formatting (URFDLB Order)
+// =====================================================
+
+getCubeString() {
+    // Kociemba Solver algorithm expects strict U -> R -> F -> D -> L -> B order
+    const faceOrder = ["U", "R", "F", "D", "L", "B"];
+    let cubeString = "";
+
+    for (const face of faceOrder) {
+        const faceStickers = this.getStickersForFace(face);
+        
+        if (faceStickers.length !== 9) {
+            throw new Error(`Invalid sticker count for face ${face}: got ${faceStickers.length}, expected 9.`);
+        }
+
+        for (const sticker of faceStickers) {
+            const faceLetter = sticker.userData.color || sticker.userData.initialFace || "U";
+            cubeString += faceLetter;
+        }
+    }
+
+    return cubeString;
+}
+
+getStickersForFace(faceName) {
+    const faceStickers = [];
+
+    this.stickers.forEach(sticker => {
+        if (sticker.userData && sticker.userData.currentFace === faceName) {
+            const worldPos = new THREE.Vector3();
+            sticker.getWorldPosition(worldPos);
+
+            faceStickers.push({
+                mesh: sticker,
+                pos: worldPos,
+                userData: sticker.userData
+            });
+        }
+    });
+
+    // Grid Order sorting (Top-Left to Bottom-Right) for 3D faces
+    return faceStickers.sort((a, b) => {
+        const pA = a.pos;
+        const pB = b.pos;
+
+        switch (faceName) {
+            case "U":
+                if (Math.abs(pA.z - pB.z) > 0.1) return pA.z - pB.z;
+                return pA.x - pB.x;
+
+            case "D":
+                if (Math.abs(pA.z - pB.z) > 0.1) return pB.z - pA.z;
+                return pA.x - pB.x;
+
+            case "F":
+                if (Math.abs(pA.y - pB.y) > 0.1) return pB.y - pA.y;
+                return pA.x - pB.x;
+
+            case "B":
+                if (Math.abs(pA.y - pB.y) > 0.1) return pB.y - pA.y;
+                return pB.x - pA.x;
+
+            case "L":
+                if (Math.abs(pA.y - pB.y) > 0.1) return pB.y - pA.y;
+                return pA.z - pB.z;
+
+            case "R":
+                if (Math.abs(pA.y - pB.y) > 0.1) return pB.y - pA.y;
+                return pB.z - pA.z;
+
+            default:
+                return 0;
+        }
+    });
+}
+
+}
+
