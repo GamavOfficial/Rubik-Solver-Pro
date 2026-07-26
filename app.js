@@ -355,6 +355,147 @@ async function solveCube() {
 }
 
 /* ==========================================
+   Solve Player State (Move Queue)
+========================================== */
+
+const solverState = {
+    solutionMoves: [],     // எ.கா: ["R", "U'", "F2", "L"]
+    currentMoveIndex: 0,   // தற்போதைய நகர்வு எண் (0 / 29)
+    totalMoves: 0,
+    isPlaying: false,
+    autoPlayTimer: null,
+    moveQueue: []          // வேகமாக கிளிக் செய்தால் Queue-வில் சேமிக்க
+};
+
+// DOM Elements
+const prevMoveBtn = document.getElementById("previous-face"); // அல்லது உங்கள் Previous Button ID
+const nextMoveBtn = document.getElementById("next-face");     // அல்லது உங்கள் Next Button ID
+const moveCounterDisplay = document.getElementById("face-counter"); // Step Counter (e.g. 0 / 29)
+
+/* ==========================================
+   Solve Function Setup
+========================================== */
+
+async function solveCube() {
+    try {
+        const cubeString = cubeEngine.getCubeString();
+
+        if (!cubeString || cubeString.length !== 54) {
+            showToast("Invalid Cube State!");
+            return;
+        }
+
+        const cube = Cube.fromString(cubeString);
+
+        if (cube.isSolved()) {
+            showToast("Cube is already solved!");
+            return;
+        }
+
+        const solution = cube.solve(22); // Solutions String (e.g. "R U R' U'")
+
+        if (solution) {
+            // தீர்வை தனித்தனி Moves-ஆகப் பிரித்தல்
+            solverState.solutionMoves = solution.trim().split(/\s+/);
+            solverState.totalMoves = solverState.solutionMoves.length;
+            solverState.currentMoveIndex = 0;
+            solverState.moveQueue = [];
+
+            updateMoveUI();
+            showToast(`Solution found! Total moves: ${solverState.totalMoves}`);
+            
+            // Solver UI / Controls-ஐக் காண்பிக்கலாம்
+        } else {
+            showToast("No solution found for this configuration.");
+        }
+
+    } catch (e) {
+        alert("Solver Error: " + e.message);
+        console.error(e);
+    }
+}
+
+/* ==========================================
+   Queue-based Safe Animation Execution
+========================================== */
+
+async function processMoveQueue() {
+    if (solverState.isPlaying || solverState.moveQueue.length === 0) {
+        return;
+    }
+
+    solverState.isPlaying = true;
+    const direction = solverState.moveQueue.shift(); // 'next' அல்லது 'prev'
+
+    if (direction === "next" && solverState.currentMoveIndex < solverState.totalMoves) {
+        const move = solverState.solutionMoves[solverState.currentMoveIndex];
+        
+        // 1 Move Animation இயக்குதல்
+        await cubeEngine.applyAlgorithm(move); 
+        
+        solverState.currentMoveIndex++;
+        updateMoveUI();
+
+    } else if (direction === "prev" && solverState.currentMoveIndex > 0) {
+        solverState.currentMoveIndex--;
+        const move = solverState.solutionMoves[solverState.currentMoveIndex];
+        
+        // எதிர்திசையில் Move செய்ய (Inverse Move: e.g., R -> R', U' -> U)
+        const inverseMove = getInverseMove(move);
+        await cubeEngine.applyAlgorithm(inverseMove);
+        
+        updateMoveUI();
+    }
+
+    solverState.isPlaying = false;
+
+    // Queue-வில் அடுத்த Move இருந்தால் அதைத் தொடரவும்
+    if (solverState.moveQueue.length > 0) {
+        processMoveQueue();
+    }
+}
+
+/* ==========================================
+   Helper Functions
+========================================== */
+
+// Inverse Move கணக்கிடுதல் (Reverse செய்ய)
+function getInverseMove(move) {
+    if (move.endsWith("'")) {
+        return move.slice(0, -1); // R' -> R
+    } else if (move.endsWith("2")) {
+        return move;             // R2 -> R2
+    } else {
+        return move + "'";       // R -> R'
+    }
+}
+
+// UI Counter Update (e.g. "1 / 29")
+function updateMoveUI() {
+    if (moveCounterDisplay) {
+        moveCounterDisplay.textContent = `${solverState.currentMoveIndex} / ${solverState.totalMoves}`;
+    }
+}
+
+/* ==========================================
+   Next / Previous Event Listeners
+========================================== */
+
+nextMoveBtn.addEventListener("click", () => {
+    if (solverState.currentMoveIndex < solverState.totalMoves) {
+        solverState.moveQueue.push("next");
+        processMoveQueue();
+    }
+});
+
+prevMoveBtn.addEventListener("click", () => {
+    if (solverState.currentMoveIndex > 0) {
+        solverState.moveQueue.push("prev");
+        processMoveQueue();
+    }
+});
+
+/* ==========================================
    Window Resize Handling
 ========================================== */
 
