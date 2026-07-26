@@ -936,26 +936,15 @@ previousFaceBtn.addEventListener("click", () => {
 });
 
 async function solveCube(cubeState) {
-
-    alert("Solve button clicked");
     
-    alert(JSON.stringify(cubeState, null, 2));
 
     const cubeString = getCubeString();
-
-    alert(cubeString);
     
     const order = ["U", "R", "F", "D", "L", "B"];
-
-for (const face of order) {
-    alert(face + " = " + cubeState[face].join(""));
-}
 
     try {
 
         const cube = Cube.fromString(cubeString);
-
-alert("Cube created");
 
 alert(cube.isSolved());
 
@@ -965,37 +954,19 @@ alert(cubeString === cube.asString());
 
 const faces = ["U", "R", "F", "D", "L", "B"];
 
-for (let i = 0; i < faces.length; i++) {
-    const face = faces[i];
-    const inputFace = cubeString.slice(i * 9, i * 9 + 9);
-    const cubeFace = cube.asString().slice(i * 9, i * 9 + 9);
 
-    alert(
-        face +
-        "\nInput: " + inputFace +
-        "\nCube : " + cubeFace
-    );
-}
-
-alert("Compare Finished");
 
 const testCube = new Cube();
 
 testCube.randomize();
 
-alert("Testing solver...");
-
 const testSolution = testCube.solve();
-
-alert(testSolution);
 
 console.time("solve");
 
 const solution = cube.solve();
 
 console.timeEnd("solve");
-
-alert("Solver finished");
 
 alert(solution);
 
