@@ -193,10 +193,16 @@ const validateBtn = document.getElementById("validate-btn");
 const solveBtn = document.getElementById("solve-btn");
 const previousFaceBtn = document.getElementById("previous-face");
 const nextFaceBtn = document.getElementById("next-face");
+const moveCounterDisplay = document.getElementById("face-counter");
 
 function updateFaceCounter() {
-    document.getElementById("face-counter").textContent = `${appState.currentFace + 1} / ${appState.totalFaces}`;
-    document.getElementById("face-progress").value = appState.currentFace + 1;
+    if (moveCounterDisplay) {
+        moveCounterDisplay.textContent = `${appState.currentFace + 1} / ${appState.totalFaces}`;
+    }
+    const progressElem = document.getElementById("face-progress");
+    if (progressElem) {
+        progressElem.value = appState.currentFace + 1;
+    }
 }
 
 function updateValidateButton() {
@@ -271,32 +277,16 @@ function updateFilledCounterFromEngine() {
 }
 
 /* ==========================================
-   Face Navigation
+   Solve Player State (Move Queue)
 ========================================== */
 
-const faceOrderList = ["F", "R", "B", "L", "U", "D"];
-
-function showCurrentFace() {
-    updateFaceCounter();
-    const targetFace = faceOrderList[appState.currentFace];
-    cubeEngine.navigateToFace(targetFace);
-}
-
-nextFaceBtn.addEventListener("click", () => {
-    if (cubeEngine.isAnimating) return;
-    if (appState.currentFace >= 5) return;
-
-    appState.currentFace++;
-    showCurrentFace();
-});
-
-previousFaceBtn.addEventListener("click", () => {
-    if (cubeEngine.isAnimating) return;
-    if (appState.currentFace <= 0) return;
-
-    appState.currentFace--;
-    showCurrentFace();
-});
+const solverState = {
+    solutionMoves: [],     
+    currentMoveIndex: 0,   
+    totalMoves: 0,
+    isPlaying: false,
+    moveQueue: []          
+};
 
 /* ==========================================
    Validation & Solve Execution
@@ -325,7 +315,6 @@ solveBtn.addEventListener("click", () => {
 async function solveCube() {
     try {
         const cubeString = cubeEngine.getCubeString();
-        console.log("Kociemba Cube String:", cubeString);
 
         if (!cubeString || cubeString.length !== 54) {
             showToast("Invalid Cube State!");
@@ -342,69 +331,14 @@ async function solveCube() {
         const solution = cube.solve(22);
 
         if (solution) {
-            showToast("Solution Found! Animating...");
-            cubeEngine.applyAlgorithm(solution);
-        } else {
-            showToast("No solution found for this cube configuration.");
-        }
-
-    } catch (e) {
-        alert("Solver Error: " + e.message);
-        console.error(e);
-    }
-}
-
-/* ==========================================
-   Solve Player State (Move Queue)
-========================================== */
-
-const solverState = {
-    solutionMoves: [],     // எ.கா: ["R", "U'", "F2", "L"]
-    currentMoveIndex: 0,   // தற்போதைய நகர்வு எண் (0 / 29)
-    totalMoves: 0,
-    isPlaying: false,
-    autoPlayTimer: null,
-    moveQueue: []          // வேகமாக கிளிக் செய்தால் Queue-வில் சேமிக்க
-};
-
-// DOM Elements
-const prevMoveBtn = document.getElementById("previous-face"); // அல்லது உங்கள் Previous Button ID
-const nextMoveBtn = document.getElementById("next-face");     // அல்லது உங்கள் Next Button ID
-const moveCounterDisplay = document.getElementById("face-counter"); // Step Counter (e.g. 0 / 29)
-
-/* ==========================================
-   Solve Function Setup
-========================================== */
-
-async function solveCube() {
-    try {
-        const cubeString = cubeEngine.getCubeString();
-
-        if (!cubeString || cubeString.length !== 54) {
-            showToast("Invalid Cube State!");
-            return;
-        }
-
-        const cube = Cube.fromString(cubeString);
-
-        if (cube.isSolved()) {
-            showToast("Cube is already solved!");
-            return;
-        }
-
-        const solution = cube.solve(22); // Solutions String (e.g. "R U R' U'")
-
-        if (solution) {
-            // தீர்வை தனித்தனி Moves-ஆகப் பிரித்தல்
             solverState.solutionMoves = solution.trim().split(/\s+/);
             solverState.totalMoves = solverState.solutionMoves.length;
             solverState.currentMoveIndex = 0;
             solverState.moveQueue = [];
 
+            appState.solving = true;
             updateMoveUI();
-            showToast(`Solution found! Total moves: ${solverState.totalMoves}`);
-            
-            // Solver UI / Controls-ஐக் காண்பிக்கலாம்
+            showToast(`Solution found! Steps: ${solverState.totalMoves}`);
         } else {
             showToast("No solution found for this configuration.");
         }
@@ -425,12 +359,11 @@ async function processMoveQueue() {
     }
 
     solverState.isPlaying = true;
-    const direction = solverState.moveQueue.shift(); // 'next' அல்லது 'prev'
+    const direction = solverState.moveQueue.shift();
 
     if (direction === "next" && solverState.currentMoveIndex < solverState.totalMoves) {
         const move = solverState.solutionMoves[solverState.currentMoveIndex];
         
-        // 1 Move Animation இயக்குதல்
         await cubeEngine.applyAlgorithm(move); 
         
         solverState.currentMoveIndex++;
@@ -440,7 +373,6 @@ async function processMoveQueue() {
         solverState.currentMoveIndex--;
         const move = solverState.solutionMoves[solverState.currentMoveIndex];
         
-        // எதிர்திசையில் Move செய்ய (Inverse Move: e.g., R -> R', U' -> U)
         const inverseMove = getInverseMove(move);
         await cubeEngine.applyAlgorithm(inverseMove);
         
@@ -449,28 +381,21 @@ async function processMoveQueue() {
 
     solverState.isPlaying = false;
 
-    // Queue-வில் அடுத்த Move இருந்தால் அதைத் தொடரவும்
     if (solverState.moveQueue.length > 0) {
         processMoveQueue();
     }
 }
 
-/* ==========================================
-   Helper Functions
-========================================== */
-
-// Inverse Move கணக்கிடுதல் (Reverse செய்ய)
 function getInverseMove(move) {
     if (move.endsWith("'")) {
-        return move.slice(0, -1); // R' -> R
+        return move.slice(0, -1);
     } else if (move.endsWith("2")) {
-        return move;             // R2 -> R2
+        return move;
     } else {
-        return move + "'";       // R -> R'
+        return move + "'";
     }
 }
 
-// UI Counter Update (e.g. "1 / 29")
 function updateMoveUI() {
     if (moveCounterDisplay) {
         moveCounterDisplay.textContent = `${solverState.currentMoveIndex} / ${solverState.totalMoves}`;
@@ -478,20 +403,44 @@ function updateMoveUI() {
 }
 
 /* ==========================================
-   Next / Previous Event Listeners
+   Face Navigation & Step Navigation Events
 ========================================== */
 
-nextMoveBtn.addEventListener("click", () => {
-    if (solverState.currentMoveIndex < solverState.totalMoves) {
-        solverState.moveQueue.push("next");
-        processMoveQueue();
+const faceOrderList = ["F", "R", "B", "L", "U", "D"];
+
+nextFaceBtn.addEventListener("click", () => {
+    if (appState.solving) {
+        // Solve Mode: Step forward
+        if (solverState.currentMoveIndex < solverState.totalMoves) {
+            solverState.moveQueue.push("next");
+            processMoveQueue();
+        }
+    } else {
+        // Edit Mode: Rotate Face
+        if (cubeEngine.isAnimating) return;
+        if (appState.currentFace >= 5) return;
+
+        appState.currentFace++;
+        updateFaceCounter();
+        cubeEngine.navigateToFace(faceOrderList[appState.currentFace]);
     }
 });
 
-prevMoveBtn.addEventListener("click", () => {
-    if (solverState.currentMoveIndex > 0) {
-        solverState.moveQueue.push("prev");
-        processMoveQueue();
+previousFaceBtn.addEventListener("click", () => {
+    if (appState.solving) {
+        // Solve Mode: Step backward
+        if (solverState.currentMoveIndex > 0) {
+            solverState.moveQueue.push("prev");
+            processMoveQueue();
+        }
+    } else {
+        // Edit Mode: Rotate Face
+        if (cubeEngine.isAnimating) return;
+        if (appState.currentFace <= 0) return;
+
+        appState.currentFace--;
+        updateFaceCounter();
+        cubeEngine.navigateToFace(faceOrderList[appState.currentFace]);
     }
 });
 
