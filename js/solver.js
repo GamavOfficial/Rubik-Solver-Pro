@@ -1,48 +1,99 @@
+// =======================================
+// Rubik Solver Pro
+// js/solver.js
+// =======================================
+
+let solutionMoves = [];
+let solverReady = false;
+
 /**
- * Solver Integration Module
- * Solves the cube state string without freezing browser main thread
+ * Initialize solver (Run only once)
  */
+function initializeSolver() {
+    if (solverReady) return;
 
-let initialized = false;
-
-export function initSolver() {
-    if (!initialized && typeof Cube !== 'undefined' && Cube.initSolver) {
+    if (typeof Cube !== 'undefined' && Cube.initSolver) {
         Cube.initSolver();
-        initialized = true;
+        solverReady = true;
     }
 }
 
-export async function solveCube(cubeString) {
-    return new Promise((resolve, reject) => {
-        try {
-            initSolver();
+/**
+ * Convert 3D Cube / Editor State to 54-character Kociemba String (U R F D L B)
+ */
+function getCubeString() {
+    if (!window.cubeState && !window.rubiksCubeGroup) {
+        return null;
+    }
 
-            // Asynchronous Execution via Event Loop
-            setTimeout(() => {
-                try {
-                    const cube = Cube.fromString(cubeString);
+    // Kociemba Algorithm-க்கு தேவையான சரியான பக்க வரிசை (U -> R -> F -> D -> L -> B)
+    const faceOrder = ['U', 'R', 'F', 'D', 'L', 'B'];
+    let cubeString = "";
 
-                    if (cube.isSolved()) {
-                        resolve([]);
-                        return;
-                    }
+    // Editor-இல் உள்ள 6 பக்கங்களின் தரவுகளை URFDLB வரிசையில் இணைத்தல்
+    if (window.cubeState) {
+        faceOrder.forEach(face => {
+            if (window.cubeState[face]) {
+                window.cubeState[face].forEach(sticker => {
+                    cubeString += sticker; // U, R, F, D, L, B எழுத்துகள்
+                });
+            }
+        });
+    }
 
-                    // Solve execution call
-                    const solution = cube.solve();
+    return cubeString;
+}
 
-                    if (!solution) {
-                        reject(new Error("No solution found for current cube permutation."));
-                        return;
-                    }
+/**
+ * Solve Cube and return moves array
+ */
+function solveCube() {
+    initializeSolver();
 
-                    const moves = solution.trim().split(/\s+/);
-                    resolve(moves);
-                } catch (err) {
-                    reject(err);
-                }
-            }, 30);
-        } catch (err) {
-            reject(err);
+    const cubeString = getCubeString();
+
+    if (!cubeString || cubeString.length !== 54) {
+        console.error("Invalid cube string state");
+        alert("க்யூப் தரவு தவறாக உள்ளது!");
+        return [];
+    }
+
+    try {
+        const parsedCube = Cube.fromString(cubeString);
+        const solution = parsedCube.solve(22);
+
+        if (!solution) {
+            console.error("Unable to solve cube");
+            return [];
         }
-    });
+
+        solutionMoves = solution.trim().split(/\s+/);
+
+        if (typeof loadSolution === 'function') {
+            loadSolution(solutionMoves);
+        }
+
+        return solutionMoves;
+    } catch (err) {
+        console.error("Solver Execution Error:", err);
+        alert("க்யூப்பைத் தீர்ப்பதில் பிழை: " + err.message);
+        return [];
+    }
+}
+
+/**
+ * Get solution array
+ */
+function getSolutionMoves() {
+    return solutionMoves;
+}
+
+/**
+ * Reset solver
+ */
+function resetSolver() {
+    solutionMoves = [];
+    if (typeof resetPlayer === 'function') {
+        resetPlayer();
+    }
 }
