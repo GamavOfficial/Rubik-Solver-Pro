@@ -538,18 +538,16 @@ const COLOR_TO_FACE = {
 };
 
 function getStickerIndex(cubie, faceLetter) {
-
     const x = cubie.userData.x;
     const y = cubie.userData.y;
     const z = cubie.userData.z;
 
     switch (faceLetter) {
-
         case "U":
-            return (1 - z) * 3 + (x + 1);
+            return (z + 1) * 3 + (x + 1);
 
         case "D":
-            return (z + 1) * 3 + (x + 1);
+            return (1 - z) * 3 + (1 - x);
 
         case "F":
             return (1 - y) * 3 + (x + 1);
@@ -558,16 +556,14 @@ function getStickerIndex(cubie, faceLetter) {
             return (1 - y) * 3 + (1 - x);
 
         case "R":
-            return (1 - y) * 3 + (1 - z);
+            return (1 - y) * 3 + (z + 1);
 
         case "L":
-            return (1 - y) * 3 + (z + 1);
+            return (1 - y) * 3 + (1 - z);
 
         default:
             return -1;
-
     }
-
 }
 /* ==========================================
    Three.js Scene Setup
