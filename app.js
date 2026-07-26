@@ -87,23 +87,13 @@ splashScreen.classList.add("hidden");
 mainApp.classList.remove("hidden");
 
 setTimeout(() => {
-
-    camera.aspect =
-        viewer.clientWidth /
-        viewer.clientHeight;
-
-    camera.updateProjectionMatrix();
-
-    renderer.setSize(
-        viewer.clientWidth,
-        viewer.clientHeight
-    );
-
-    renderer.render(scene, camera);
-
+    if (window.cubeEngine) {
+        window.cubeEngine.onResize();
+    }
 }, 100);
 
 showToast("Welcome to Rubik Solver Pro");
+
 
 }
 
@@ -847,133 +837,71 @@ function animate() {
 
 animate();
 
-const faceRotations = [
-    null,
-    "right",
-    "up",
-    "right",
-    "right",
-    "up"
-];
-
-function debugRotation(move) {
-    console.log(
-        "Face:",
-        appState.currentFace,
-        "Move:",
-        move,
-        "Quaternion:",
-        rubiksCube.quaternion.toArray()
-    );
-}
+const faceOrderList = ["F", "R", "B", "L", "U", "D"];
 
 function showCurrentFace() {
     updateFaceCounter();
+    const targetFace = faceOrderList[appState.currentFace];
+    cubeEngine.navigateToFace(targetFace);
 }
 
 nextFaceBtn.addEventListener("click", () => {
-
-    if (cubeRotation.isAnimating()) return;
-
+    if (cubeEngine.isAnimating) return;
     if (appState.currentFace >= 5) return;
 
     appState.currentFace++;
-
-    const move = faceRotations[appState.currentFace];
-
-    if (move) {
-    debugRotation(move);
-    cubeRotation.rotate(move);
-}
-
     showCurrentFace();
-
 });
 
 previousFaceBtn.addEventListener("click", () => {
-
-    if (cubeRotation.isAnimating()) return;
-
+    if (cubeEngine.isAnimating) return;
     if (appState.currentFace <= 0) return;
 
-    const move = faceRotations[appState.currentFace];
-
-    if (move === "right") {
-        cubeRotation.rotate("left");
-    } else if (move === "up") {
-        cubeRotation.rotate("down");
-    }
-
     appState.currentFace--;
-
     showCurrentFace();
-
 });
 
-async function solveCube(cubeState) {
-    
 
-    const cubeString = getCubeString();
-    
-
+async function solveCube() {
     try {
+        const cubeString = cubeEngine.getCubeString();
+        console.log("Kociemba Cube String:", cubeString);
+
+        if (!cubeString || cubeString.length !== 54) {
+            showToast("Invalid Cube State!");
+            return;
+        }
 
         const cube = Cube.fromString(cubeString);
 
-alert(cube.isSolved());
+        if (cube.isSolved()) {
+            showToast("Cube is already solved!");
+            return;
+        }
 
-alert("Before solve");
+        const solution = cube.solve(22);
 
-const solution = cube.solve();
-
-alert("After solve");
-
-alert(solution);
+        if (solution) {
+            showToast("Solution Found! Animating...");
+            cubeEngine.applyAlgorithm(solution);
+        } else {
+            showToast("No solution found for this cube configuration.");
+        }
 
     } catch (e) {
-
-        alert(e.message);
-
+        alert("Solver Error: " + e.message);
         console.error(e);
-
     }
-
 }
 
-function getCubeString() {
-
-    let result = "";
-
-    const order = ["U", "R", "F", "D", "L", "B"];
-
-    for (const face of order) {
-
-        result += cubeState[face].join("");
-
-    }
-
-    return result;
-
-}
 
 /* ==========================================
-   Window Resize
+   Window Resize Handling
 ========================================== */
 
-window.addEventListener(
-    "resize",
-    () => {
-
-        camera.aspect =
-            viewer.clientWidth /
-            viewer.clientHeight;
-
-        camera.updateProjectionMatrix();
-
-        renderer.setSize(
-            viewer.clientWidth,
-            viewer.clientHeight
-        );
-
+window.addEventListener("resize", () => {
+    if (window.cubeEngine) {
+        window.cubeEngine.onResize();
     }
-);
+});
+
