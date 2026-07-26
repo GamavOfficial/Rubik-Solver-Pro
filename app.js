@@ -545,11 +545,13 @@ function getStickerIndex(cubie, faceLetter) {
 
     switch (faceLetter) {
 
+        // U face: left -> right, back -> front
         case "U":
-            return (1 - z) * 3 + (x + 1);
-
-        case "D":
             return (z + 1) * 3 + (x + 1);
+
+        // D face: left -> right, front -> back
+        case "D":
+            return (1 - z) * 3 + (x + 1);
 
         case "F":
             return (1 - y) * 3 + (x + 1);
@@ -565,9 +567,7 @@ function getStickerIndex(cubie, faceLetter) {
 
         default:
             return -1;
-
     }
-
 }
 /* ==========================================
    Three.js Scene Setup
