@@ -1,10 +1,7 @@
 import * as THREE from "three";
-//import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import CubeEngine from "./js/cube-engine.js";
-import { CubeRotation } from "./js/cube-rotation.js";
 
 Cube.initSolver();
-
 
 /* ==========================================
    Rubik Solver Pro
@@ -27,21 +24,13 @@ const toast = document.getElementById("toast");
 // ---------- App State ----------
 
 const appState = {
-
     currentFace: 0,
-
     totalFaces: 6,
-
     selectedColor: "white",
-
     filledStickers: 0,
-
     cubeValidated: false,
-
     cubeSolved: false,
-
     solving: false
-
 };
 
 // ---------- Utility ----------
@@ -53,171 +42,99 @@ function sleep(ms) {
 // ---------- Toast ----------
 
 function showToast(message) {
-
     toast.textContent = message;
-
     toast.classList.add("show");
-
     setTimeout(() => {
-
         toast.classList.remove("show");
-
     }, 2500);
-
 }
 
 // ---------- Splash Loading ----------
 
 async function startSplash() {
-
     let progress = 0;
-
     while (progress <= 100) {
-
         loadingProgress.style.width = progress + "%";
-
         await sleep(25);
-
         progress++;
-
     }
 
-splashScreen.classList.add("hidden");
+    splashScreen.classList.add("hidden");
+    mainApp.classList.remove("hidden");
 
-mainApp.classList.remove("hidden");
+    setTimeout(() => {
+        if (window.cubeEngine) {
+            window.cubeEngine.onResize();
+        }
+    }, 100);
 
-setTimeout(() => {
-    if (window.cubeEngine) {
-        window.cubeEngine.onResize();
-    }
-}, 100);
-
-showToast("Welcome to Rubik Solver Pro");
-
-
+    showToast("Welcome to Rubik Solver Pro");
 }
 
 // ---------- Start App ----------
 
 window.addEventListener("load", () => {
-
     startSplash();
-
 });
+
 /* ==========================================
    Theme System
 ========================================== */
 
 const themeBtn = document.getElementById("theme-btn");
-
 let currentTheme = localStorage.getItem("theme") || "dark";
 
 applyTheme(currentTheme);
 
 themeBtn.addEventListener("click", () => {
-
-    currentTheme =
-        currentTheme === "dark"
-            ? "light"
-            : "dark";
-
+    currentTheme = currentTheme === "dark" ? "light" : "dark";
     applyTheme(currentTheme);
-
 });
 
 function applyTheme(theme) {
-
-    document.body.setAttribute(
-        "data-theme",
-        theme
-    );
-
-    localStorage.setItem(
-        "theme",
-        theme
-    );
-
-    themeBtn.textContent =
-        theme === "dark"
-            ? "🌙"
-            : "☀️";
-
+    document.body.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+    themeBtn.textContent = theme === "dark" ? "🌙" : "☀️";
 }
 
 /* ==========================================
    Settings Button
 ========================================== */
 
-const settingsBtn =
-document.getElementById("settings-btn");
-
+const settingsBtn = document.getElementById("settings-btn");
 settingsBtn.addEventListener("click", () => {
-
-    showToast(
-        "Settings coming soon..."
-    );
-
+    showToast("Settings coming soon...");
 });
 
 /* ==========================================
    Install PWA
 ========================================== */
 
-const installBtn =
-document.getElementById("install-btn");
-
+const installBtn = document.getElementById("install-btn");
 let deferredPrompt = null;
 
-window.addEventListener(
-    "beforeinstallprompt",
-    (event) => {
+window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    deferredPrompt = event;
+    installBtn.style.display = "inline-flex";
+});
 
-        event.preventDefault();
-
-        deferredPrompt = event;
-
-        installBtn.style.display = "inline-flex";
-
+installBtn.addEventListener("click", async () => {
+    if (!deferredPrompt) {
+        showToast("Install not available.");
+        return;
     }
-);
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installBtn.style.display = "none";
+});
 
-installBtn.addEventListener(
-    "click",
-    async () => {
+window.addEventListener("appinstalled", () => {
+    showToast("Rubik Solver installed!");
+    installBtn.style.display = "none";
+});
 
-        if (!deferredPrompt) {
-
-            showToast(
-                "Install not available."
-            );
-
-            return;
-
-        }
-
-        deferredPrompt.prompt();
-
-        await deferredPrompt.userChoice;
-
-        deferredPrompt = null;
-
-        installBtn.style.display = "none";
-
-    }
-);
-
-window.addEventListener(
-    "appinstalled",
-    () => {
-
-        showToast(
-            "Rubik Solver installed!"
-        );
-
-        installBtn.style.display = "none";
-
-    }
-);
 /* ==========================================
    Color Picker
 ========================================== */
@@ -242,276 +159,58 @@ const colorUsage = {
     green: 0
 };
 
-// Default selected color
 setActiveColor("white");
 
 colorButtons.forEach(button => {
-
     button.addEventListener("click", () => {
-
         const color = button.dataset.color;
-
         setActiveColor(color);
-
     });
-
 });
 
 function setActiveColor(color) {
-
     appState.selectedColor = color;
-
     colorButtons.forEach(btn => {
-
         btn.classList.remove("active");
-
     });
-
-    document
-        .querySelector(`[data-color="${color}"]`)
-        .classList.add("active");
-
+    document.querySelector(`[data-color="${color}"]`).classList.add("active");
 }
 
 function updateColorCounters() {
-
     Object.keys(colorUsage).forEach(color => {
-
-        colorCounters[color].textContent =
-            `${colorUsage[color]}/9`;
-
-        const button =
-            document.querySelector(`[data-color="${color}"]`);
-
-        button.disabled =
-            colorUsage[color] >= 9;
-
+        colorCounters[color].textContent = `${colorUsage[color]}/9`;
+        const button = document.querySelector(`[data-color="${color}"]`);
+        button.disabled = colorUsage[color] >= 9;
     });
-
 }
-/* ==========================================
-   Cube Data
-========================================== */
-
-const FACE_NAMES = [
-    "U",
-    "R",
-    "F",
-    "D",
-    "L",
-    "B"
-];
-
-const cubeState = {
-
-    U: Array(9).fill(null),
-    R: Array(9).fill(null),
-    F: Array(9).fill(null),
-    D: Array(9).fill(null),
-    L: Array(9).fill(null),
-    B: Array(9).fill(null)
-
-};
-
-const filledCount =
-document.getElementById("filled-count");
-
-const validateBtn =
-document.getElementById("validate-btn");
-
-const solveBtn =
-document.getElementById("solve-btn");
-
-const previousFaceBtn =
-document.getElementById("previous-face");
-
-const nextFaceBtn =
-document.getElementById("next-face");
 
 /* ==========================================
-   Face Counter
+   Cube Data & Controls Setup
 ========================================== */
+
+const filledCount = document.getElementById("filled-count");
+const validateBtn = document.getElementById("validate-btn");
+const solveBtn = document.getElementById("solve-btn");
+const previousFaceBtn = document.getElementById("previous-face");
+const nextFaceBtn = document.getElementById("next-face");
 
 function updateFaceCounter() {
-
-    document.getElementById("face-counter").textContent =
-        `${appState.currentFace + 1} / ${appState.totalFaces}`;
-
-    document.getElementById("face-progress").value =
-        appState.currentFace + 1;
-
+    document.getElementById("face-counter").textContent = `${appState.currentFace + 1} / ${appState.totalFaces}`;
+    document.getElementById("face-progress").value = appState.currentFace + 1;
 }
-
-/* ==========================================
-   Filled Counter
-========================================== */
-
-function updateFilledCounter() {
-
-    let total = 0;
-
-    Object.values(cubeState).forEach(face => {
-
-        face.forEach(sticker => {
-
-            if (sticker !== null) {
-
-                total++;
-
-            }
-
-        });
-
-    });
-
-    appState.filledStickers = total;
-
-    filledCount.textContent =
-        `${total} / 54`;
-
-}
-
-/* ==========================================
-   Validate Button
-========================================== */
 
 function updateValidateButton() {
-
-    if (appState.filledStickers === 54) {
-
-        validateBtn.disabled = false;
-
-    } else {
-
-        validateBtn.disabled = true;
-
-    }
-
+    validateBtn.disabled = appState.filledStickers !== 54;
 }
-
-/* ==========================================
-   Cube Validation
-========================================== */
-
-function validateCube() {
-
-    console.log("validateCube called");
-
-    const counts = {
-        U: 0,
-        R: 0,
-        F: 0,
-        D: 0,
-        L: 0,
-        B: 0
-    };
-
-    for (const face of Object.keys(cubeState)) {
-
-        for (const sticker of cubeState[face]) {
-
-            if (sticker === null) {
-
-                showToast("Complete all 54 stickers.");
-
-                return false;
-
-            }
-
-            if (!(sticker in counts)) {
-
-                showToast("Invalid sticker detected.");
-
-                return false;
-
-            }
-
-            counts[sticker]++;
-
-        }
-
-    }
-
-    for (const face of Object.keys(counts)) {
-
-    if (counts[face] !== 9) {
-
-        alert(face + " = " + counts[face]);
-
-        return false;
-
-    }
-
-}
-
-    console.log(counts);
-alert(JSON.stringify(counts));
-
-appState.cubeValidated = true;
-
-showToast("Cube validation successful.");
-
-return true;
-
-}
-
-/* ==========================================
-   Validate Button Event
-========================================== */
-
-validateBtn.addEventListener("click", () => {
-
-
-    console.log("Validate button clicked");
-
-    if (validateCube()) {
-
-
-        solveBtn.disabled = false;
-        solveBtn.classList.remove("hidden");
-
-    }
-
-});
-
-/* ==========================================
-   Solve Button Event
-========================================== */
-
-solveBtn.addEventListener("click", () => {
-
-    if (!appState.cubeValidated) {
-        showToast("Validate cube first.");
-        return;
-    }
-
-    solveCube(cubeState);
-
-});
-
-/* ==========================================
-   Refresh UI
-========================================== */
 
 function refreshEditor() {
-
     updateFaceCounter();
-
-    updateFilledCounter();
-
     updateValidateButton();
-
     updateColorCounters();
-
 }
 
 refreshEditor();
-
 solveBtn.disabled = true;
-
-/* ==========================================
-   Cube State Mapping
-========================================== */
 
 const COLOR_TO_FACE = {
     white: "U",
@@ -522,320 +221,58 @@ const COLOR_TO_FACE = {
     blue: "B"
 };
 
-function getStickerIndex(cubie, faceLetter) {
-    const x = cubie.userData.x;
-    const y = cubie.userData.y;
-    const z = cubie.userData.z;
-
-    switch (faceLetter) {
-        case "U":
-            return (z + 1) * 3 + (x + 1);
-
-        case "D":
-            return (1 - z) * 3 + (1 - x);
-
-        case "F":
-            return (1 - y) * 3 + (x + 1);
-
-        case "B":
-            return (1 - y) * 3 + (1 - x);
-
-        case "R":
-            return (1 - y) * 3 + (z + 1);
-
-        case "L":
-            return (1 - y) * 3 + (1 - z);
-
-        default:
-            return -1;
-    }
-}
 /* ==========================================
-   Three.js Scene Setup
+   CubeEngine Integration
 ========================================== */
 
 const viewer = document.getElementById("viewer");
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x101826);
-
-const camera = new THREE.PerspectiveCamera(
-    35,
-    viewer.clientWidth / viewer.clientHeight,
-    0.1,
-    1000
-);
-
-camera.position.set(4.5,4.5,4.5);
-
-const renderer = new THREE.WebGLRenderer({
-    antialias: true,
-    alpha: true
+const cubeEngine = new CubeEngine({
+    turnSpeed: 200
 });
 
-renderer.setPixelRatio(window.devicePixelRatio);
+cubeEngine.initialize(viewer);
+window.cubeEngine = cubeEngine;
 
-renderer.setSize(
-    viewer.clientWidth,
-    viewer.clientHeight
-);
+cubeEngine.onStickerTapped = function(sticker) {
+    const activeColorKey = appState.selectedColor;
+    const faceLetter = COLOR_TO_FACE[activeColorKey];
 
-viewer.appendChild(renderer.domElement);
+    const currentStickerColor = sticker.userData.color;
 
-camera.position.set(0, 0, 8);
-camera.lookAt(0, 0, 0);
-
-/* ==========================================
-   Lights
-========================================== */
-
-const ambientLight = new THREE.AmbientLight(
-    0xffffff,
-    2
-);
-
-scene.add(ambientLight);
-
-const directionalLight = new THREE.DirectionalLight(
-    0xffffff,
-    3
-);
-
-directionalLight.position.set(5, 10, 7);
-
-scene.add(directionalLight);
-
-/* ==========================================
-   Orbit Controls
-========================================== */
-/*
-const controls = new OrbitControls(
-    camera,
-    renderer.domElement
-);
-
-controls.target.set(0, 0, 0);
-controls.update();
-
-controls.enableDamping = false;
-
-controls.enableRotate = false;
-controls.enableZoom = false;
-controls.enablePan = false;
-
-camera.position.set(0,0,8);
-camera.lookAt(0,0,0);*/
-
-
-/* ==========================================
-   Rubik's Cube (27 Cubies)
-========================================== */
-
-const rubiksCube = new THREE.Group();
-
-const cubieSize = 0.95;
-const gap = 0.05;
-
-const colorMap = {
-    white: 0xffffff,
-    yellow: 0xffff00,
-    red: 0xff0000,
-    orange: 0xff8800,
-    blue: 0x0000ff,
-    green: 0x00aa00
-};
-
-for (let x = -1; x <= 1; x++) {
-    for (let y = -1; y <= 1; y++) {
-        for (let z = -1; z <= 1; z++) {
-
-            const materials = [
-
-    new THREE.MeshStandardMaterial({ color: 0x222222 }),
-    new THREE.MeshStandardMaterial({ color: 0x222222 }),
-    new THREE.MeshStandardMaterial({ color: 0x222222 }),
-    new THREE.MeshStandardMaterial({ color: 0x222222 }),
-    new THREE.MeshStandardMaterial({ color: 0x222222 }),
-    new THREE.MeshStandardMaterial({ color: 0x222222 })
-
-];
-
-            const cubie = new THREE.Mesh(
-                new THREE.BoxGeometry(
-                    cubieSize,
-                    cubieSize,
-                    cubieSize
-                ),
-                materials
-            );
-
-            cubie.position.set(
-    x * (cubieSize + gap),
-    y * (cubieSize + gap),
-    z * (cubieSize + gap)
-);
-
-const isCenterCubie =
-    x === 0 &&
-    y === 0 &&
-    z === 0;
-    
-    if (isCenterCubie) {
-    console.log("Center Cubie Created");
-}
-
-cubie.userData = {
-    x,
-    y,
-    z,
-
-    painted: [null, null, null, null, null, null],
-    original: [null, null, null, null, null, null],
-
-    stickers: [
-        { face: "R", index: -1 },
-        { face: "L", index: -1 },
-        { face: "U", index: -1 },
-        { face: "D", index: -1 },
-        { face: "F", index: -1 },
-        { face: "B", index: -1 }
-    ]
-};
-
-rubiksCube.add(cubie);
-
+    if (currentStickerColor !== faceLetter) {
+        if (colorUsage[activeColorKey] >= 9) {
+            showToast(activeColorKey + " limit reached (9/9)");
+            return;
         }
+
+        if (currentStickerColor) {
+            const oldColorKey = Object.keys(COLOR_TO_FACE).find(key => COLOR_TO_FACE[key] === currentStickerColor);
+            if (oldColorKey && colorUsage[oldColorKey] > 0) {
+                colorUsage[oldColorKey]--;
+            }
+        }
+
+        cubeEngine.setStickerColor(sticker, faceLetter);
+        colorUsage[activeColorKey]++;
+
+        updateFilledCounterFromEngine();
+        updateValidateButton();
+        updateColorCounters();
+
+        showToast(activeColorKey + " Applied");
     }
-}
+};
 
-scene.add(rubiksCube);
-
-rubiksCube.position.set(0, 0, 0);
-
-const cubeRotation = new CubeRotation(rubiksCube);
-
-const stickers = [];
-
-const stickerSize = 0.82;
-
-/* ==========================================
-   Cube Orientation
-========================================== */
-
-
-
-
-/* ==========================================
-   Raycaster
-========================================== */
-
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-
-renderer.domElement.addEventListener(
-    "pointerdown",
-    onPointerDown
-);
-
-function onPointerDown(event) {
-
-    const rect = renderer.domElement.getBoundingClientRect();
-
-    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-
-    const intersects = raycaster.intersectObjects(rubiksCube.children);
-
-    if (intersects.length === 0) return;
-
-    const hit = intersects[0];
-    const cubie = hit.object;
-
-    // எந்த face-ஐ click செய்தோம்?
-const faceIndex = Math.floor(hit.faceIndex / 2);
-
-const previousColor = cubie.userData.painted[faceIndex];
-
-const faceLetter = ["R","L","U","D","F","B"][faceIndex];
-
-const x = cubie.userData.x;
-const y = cubie.userData.y;
-const z = cubie.userData.z;
-
-if (
-    (faceLetter === "R" && x !== 1) ||
-    (faceLetter === "L" && x !== -1) ||
-    (faceLetter === "U" && y !== 1) ||
-    (faceLetter === "D" && y !== -1) ||
-    (faceLetter === "F" && z !== 1) ||
-    (faceLetter === "B" && z !== -1)
-) {
-    return;
-}
-
-if (
-    previousColor !== appState.selectedColor &&
-    colorUsage[appState.selectedColor] >= 9
-) {
-    showToast(appState.selectedColor + " limit reached (9/9)");
-    return;
-}
-
-if (previousColor === appState.selectedColor) {
-    return;
-}
-
-if (previousColor) {
-    colorUsage[previousColor]--;
-}
-
-cubie.userData.painted[faceIndex] = appState.selectedColor;
-
-colorUsage[appState.selectedColor]++;
-
-cubie.material[faceIndex].color.setHex(
-    colorMap[appState.selectedColor]
-);
-
-const stickerIndex = getStickerIndex(cubie, faceLetter);
-
-cubeState[faceLetter][stickerIndex] =
-    COLOR_TO_FACE[appState.selectedColor];
-    
-
-updateFilledCounter();
-updateValidateButton();
-updateColorCounters();
-
-showToast(appState.selectedColor + " Applied");
-
+function updateFilledCounterFromEngine() {
+    const total = cubeEngine.getTotalStickersCompletedCount();
+    appState.filledStickers = total;
+    filledCount.textContent = `${total} / 54`;
 }
 
 /* ==========================================
-   Animation Loop
+   Face Navigation
 ========================================== */
-
-let firstFrame = true;
-
-function animate() {
-
-    if (firstFrame) {
-    
-        firstFrame = false;
-    }
-
-    requestAnimationFrame(animate);
-
-    cubeRotation.update();
-
-    renderer.render(scene, camera);
-
-}
-
-
-animate();
 
 const faceOrderList = ["F", "R", "B", "L", "U", "D"];
 
@@ -861,6 +298,29 @@ previousFaceBtn.addEventListener("click", () => {
     showCurrentFace();
 });
 
+/* ==========================================
+   Validation & Solve Execution
+========================================== */
+
+validateBtn.addEventListener("click", () => {
+    if (appState.filledStickers !== 54) {
+        showToast("Complete all 54 stickers.");
+        return;
+    }
+
+    appState.cubeValidated = true;
+    solveBtn.disabled = false;
+    solveBtn.classList.remove("hidden");
+    showToast("Cube validation successful.");
+});
+
+solveBtn.addEventListener("click", () => {
+    if (!appState.cubeValidated) {
+        showToast("Validate cube first.");
+        return;
+    }
+    solveCube();
+});
 
 async function solveCube() {
     try {
@@ -894,7 +354,6 @@ async function solveCube() {
     }
 }
 
-
 /* ==========================================
    Window Resize Handling
 ========================================== */
@@ -904,4 +363,3 @@ window.addEventListener("resize", () => {
         window.cubeEngine.onResize();
     }
 });
-
