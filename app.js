@@ -3,11 +3,8 @@ import * as THREE from "three";
 import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
-alert("Before initSolver");
-
 Cube.initSolver();
 
-alert("After initSolver");
 
 /* ==========================================
    Rubik Solver Pro
@@ -474,13 +471,11 @@ return true;
 
 validateBtn.addEventListener("click", () => {
 
-    alert("Validate button clicked");
 
     console.log("Validate button clicked");
 
     if (validateCube()) {
 
-        alert("Validation Success");
 
         solveBtn.disabled = false;
         solveBtn.classList.remove("hidden");
@@ -725,8 +720,6 @@ rubiksCube.add(cubie);
 
 scene.add(rubiksCube);
 
-alert("Cubies: " + rubiksCube.children.length);
-
 rubiksCube.position.set(0, 0, 0);
 
 const cubeRotation = new CubeRotation(rubiksCube);
@@ -777,11 +770,6 @@ const previousColor = cubie.userData.painted[faceIndex];
 
 const faceLetter = ["R","L","U","D","F","B"][faceIndex];
 
-alert(
-    "faceIndex = " + faceIndex +
-    "\nfaceLetter = " + faceLetter
-);
-
 const x = cubie.userData.x;
 const y = cubie.userData.y;
 const z = cubie.userData.z;
@@ -823,22 +811,9 @@ cubie.material[faceIndex].color.setHex(
 
 const stickerIndex = getStickerIndex(cubie, faceLetter);
 
-alert(
-    "Face = " + faceLetter +
-    "\nX = " + x +
-    "\nY = " + y +
-    "\nZ = " + z +
-    "\nIndex = " + stickerIndex
-);
-
 cubeState[faceLetter][stickerIndex] =
     COLOR_TO_FACE[appState.selectedColor];
     
-    alert(
-    faceLetter +
-    " = " +
-    cubeState[faceLetter].join("")
-);
 
 updateFilledCounter();
 updateValidateButton();
@@ -857,7 +832,7 @@ let firstFrame = true;
 function animate() {
 
     if (firstFrame) {
-        alert("Animate Started");
+    
         firstFrame = false;
     }
 
@@ -940,27 +915,12 @@ async function solveCube(cubeState) {
 
     const cubeString = getCubeString();
     
-    const order = ["U", "R", "F", "D", "L", "B"];
 
     try {
 
         const cube = Cube.fromString(cubeString);
 
 alert(cube.isSolved());
-
-alert(cube.asString());
-
-alert(cubeString === cube.asString());
-
-const faces = ["U", "R", "F", "D", "L", "B"];
-
-
-
-const testCube = new Cube();
-
-testCube.randomize();
-
-const testSolution = testCube.solve();
 
 console.time("solve");
 
