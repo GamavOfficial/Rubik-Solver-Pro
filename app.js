@@ -545,13 +545,11 @@ function getStickerIndex(cubie, faceLetter) {
 
     switch (faceLetter) {
 
-        // U face: left -> right, back -> front
         case "U":
-            return (z + 1) * 3 + (x + 1);
-
-        // D face: left -> right, front -> back
-        case "D":
             return (1 - z) * 3 + (x + 1);
+
+        case "D":
+            return (z + 1) * 3 + (x + 1);
 
         case "F":
             return (1 - y) * 3 + (x + 1);
@@ -567,7 +565,9 @@ function getStickerIndex(cubie, faceLetter) {
 
         default:
             return -1;
+
     }
+
 }
 /* ==========================================
    Three.js Scene Setup
@@ -961,20 +961,18 @@ alert(cube.asString());
 
 alert(cubeString === cube.asString());
 
-for (let i = 0; i < 54; i++) {
+const faces = ["U", "R", "F", "D", "L", "B"];
 
-    if (cubeString[i] !== cube.asString()[i]) {
+for (let i = 0; i < faces.length; i++) {
+    const face = faces[i];
+    const inputFace = cubeString.slice(i * 9, i * 9 + 9);
+    const cubeFace = cube.asString().slice(i * 9, i * 9 + 9);
 
-        alert(
-            "Mismatch at " + i +
-            "\nInput : " + cubeString[i] +
-            "\nCube  : " + cube.asString()[i]
-        );
-
-        //break;
-
-    }
-
+    alert(
+        face +
+        "\nInput: " + inputFace +
+        "\nCube : " + cubeFace
+    );
 }
 
 alert("Compare Finished");
