@@ -478,6 +478,7 @@ validateBtn.addEventListener("click", () => {
    Solve Button Event (Fixed Non-Blocking & Page Switch)
 ========================================== */
 
+// ---------- [NEW UPGRADE] Professional Kociemba Solver Execution Handler ----------
 solveBtn.addEventListener("click", async () => {
     if (!appState.cubeValidated) {
         showToast("Validate cube first.");
@@ -486,7 +487,7 @@ solveBtn.addEventListener("click", async () => {
 
     const cubeString = window.getCubeString();
 
-    if (!cubeString || cubeString.length !== 54 || cubeString.includes("null")) {
+    if (!cubeString || cubeString.length !== 54) {
         showToast("Cube stickers incomplete!");
         return;
     }
@@ -494,7 +495,6 @@ solveBtn.addEventListener("click", async () => {
     showToast("Calculating Solution... Please wait");
     solveBtn.disabled = true;
 
-    // UI பிரவுசர் ஹேங் ஆகாமல் இருக்க சிறிது இடைவெளி தருகிறது
     await sleep(50);
 
     setTimeout(() => {
@@ -511,7 +511,7 @@ solveBtn.addEventListener("click", async () => {
                 return;
             }
 
-            const solution = parsedCube.solve(22); // Maximum 22 moves
+            const solution = parsedCube.solve(22);
 
             if (solution) {
                 const moves = solution.trim().split(/\s+/);
@@ -521,14 +521,14 @@ solveBtn.addEventListener("click", async () => {
                 solveBtn.disabled = false;
             }
 
-                } catch (err) {
-
+        } catch (err) {
             console.error("Solver Error:", err);
-            showToast("Invalid Cube Layout! Check sticker colors.");
+            showToast("Invalid Cube Layout! Check corner/edge orientation.");
             solveBtn.disabled = false;
         }
     }, 50);
 });
+
 
 
 
@@ -977,14 +977,26 @@ window.addEventListener(
    Global Window Methods for Solver & Animation
 ========================================== */
 
+// ---------- [NEW UPGRADE] Professional Kociemba 54-Character String Formatter ----------
 window.getCubeString = function() {
-    let result = "";
     const order = ["U", "R", "F", "D", "L", "B"];
+    let cubeString = "";
+
     for (const face of order) {
-        result += cubeState[face].join("");
+        const faceArray = cubeState[face];
+        if (!faceArray || faceArray.length !== 9) {
+            return null;
+        }
+        for (let i = 0; i < 9; i++) {
+            const sticker = faceArray[i];
+            if (!sticker) return null;
+            cubeString += sticker;
+        }
     }
-    return result;
+
+    return cubeString.length === 54 ? cubeString : null;
 };
+
 
 // ---------- Safe Solution Handler (No Freezing) ----------
 window.loadSolution = function(moves) {
