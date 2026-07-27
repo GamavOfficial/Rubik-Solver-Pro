@@ -3,7 +3,7 @@ import * as THREE from "three";
 import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 // [NEW ADD] Import CubeAnimation for playback solution moves
-import CubeAnimation, { ANIMATION_TYPES } from "./animation.js";
+//import CubeAnimation, { ANIMATION_TYPES } from "./animation.js";
 
 
 
