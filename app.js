@@ -3,7 +3,14 @@ import * as THREE from "three";
 import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
-Cube.initSolver();
+async function solveCube() {
+    if (typeof Cube !== "undefined" && typeof Cube.initSolver === "function") {
+        Cube.initSolver();
+    }
+
+    const cubeString = getCubeString();
+    ...
+
 
 
 /* ==========================================
