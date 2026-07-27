@@ -1,22 +1,12 @@
 import * as THREE from "three";
-//import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
-
-async function solveCube() {
-    if (typeof Cube !== "undefined" && typeof Cube.initSolver === "function") {
-        Cube.initSolver();
-    }
-
-    const cubeString = getCubeString();
-    ...
-
-
 
 /* ==========================================
    Rubik Solver Pro
    App Initialization
 ========================================== */
+
 
 // ---------- DOM Elements ----------
 
@@ -928,54 +918,6 @@ previousFaceBtn.addEventListener("click", () => {
 
 });
 
-async function solveCube() {
-    const cubeString = getCubeString();
-
-    try {
-        if (!cubeString || cubeString.length !== 54) {
-            showToast("Invalid Cube State!");
-            return;
-        }
-
-        const cube = Cube.fromString(cubeString);
-
-        if (cube.isSolved()) {
-            showToast("Cube is already solved!");
-            return;
-        }
-
-        // Kociemba solver மூலம் தீர்வைக் கணக்கிடுகிறோம்
-        const solution = cube.solve();
-
-        if (solution) {
-            solverState.solutionMoves = solution.trim().split(/\s+/);
-            solverState.totalMoves = solverState.solutionMoves.length;
-            solverState.currentMoveIndex = 0;
-            solverState.moveQueue = [];
-
-            appState.solving = true;
-
-            // 3D Perspective View-க்கு மாற்றுகிறோம்
-            if (cubeRotation && typeof cubeRotation.setPerspective3DView === "function") {
-                cubeRotation.setPerspective3DView();
-            }
-
-            showToast(`Solution found! Total moves: ${solverState.totalMoves}`);
-
-            // அனிமேஷன் தானாகவே வரிசையாக நடக்க Move Queue-வை இயக்குகிறோம்
-            for (let i = 0; i < solverState.totalMoves; i++) {
-                solverState.moveQueue.push("next");
-            }
-            processMoveQueue();
-        } else {
-            showToast("No solution found!");
-        }
-
-    } catch (e) {
-        showToast("Solver Error: " + e.message);
-        console.error(e);
-    }
-}
 
 // அனிமேஷனை ஒன்றன்ப பின் ஒன்றாக வரிசையாக இயக்கும் ஃபங்க்ஷன்
 async function processMoveQueue() {
@@ -1009,24 +951,68 @@ async function processMoveQueue() {
 
 
 function getCubeString() {
-
     let result = "";
-
     const order = ["U", "R", "F", "D", "L", "B"];
-
     for (const face of order) {
-
         result += cubeState[face].join("");
+    }
+    return result;
+}
 
+async function solveCube() {
+    if (typeof Cube !== "undefined" && typeof Cube.initSolver === "function") {
+        Cube.initSolver();
     }
 
-    return result;
+    const cubeString = getCubeString();
 
+    try {
+        if (!cubeString || cubeString.length !== 54) {
+            showToast("Invalid Cube State!");
+            return;
+        }
+
+        const cube = Cube.fromString(cubeString);
+
+        if (cube.isSolved()) {
+            showToast("Cube is already solved!");
+            return;
+        }
+
+        const solution = cube.solve();
+
+        if (solution) {
+            solverState.solutionMoves = solution.trim().split(/\s+/);
+            solverState.totalMoves = solverState.solutionMoves.length;
+            solverState.currentMoveIndex = 0;
+            solverState.moveQueue = [];
+
+            appState.solving = true;
+
+            if (cubeRotation && typeof cubeRotation.setPerspective3DView === "function") {
+                cubeRotation.setPerspective3DView();
+            }
+
+            showToast(`Solution found! Total moves: ${solverState.totalMoves}`);
+
+            for (let i = 0; i < solverState.totalMoves; i++) {
+                solverState.moveQueue.push("next");
+            }
+            processMoveQueue();
+        } else {
+            showToast("No solution found!");
+        }
+
+    } catch (e) {
+        showToast("Solver Error: " + e.message);
+        console.error(e);
+    }
 }
 
 /* ==========================================
    Window Resize
 ========================================== */
+
 
 window.addEventListener(
     "resize",
@@ -1045,3 +1031,4 @@ window.addEventListener(
 
     }
 );
+
