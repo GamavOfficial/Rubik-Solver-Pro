@@ -997,8 +997,9 @@ window.getCubeString = function() {
     return cubeString.length === 54 ? cubeString : null;
 };
 
-
-// ---------- Safe Solution Handler (No Freezing) ----------
+// ==========================================
+// Safe & Engine-Connected Solution Handler
+// ==========================================
 window.loadSolution = function(moves) {
     if (!moves || moves.length === 0) {
         showToast("No solution found!");
@@ -1027,7 +1028,12 @@ window.loadSolution = function(moves) {
 
     showToast(`Solution found! ${moves.length} moves.`);
 
-    // 3. Solve Again பட்டன் வேலை செய்ய வைப்பது
+    // 3. [NEW] கியூப் இன்ஜினுக்கு மூவ்களை அனுப்பி 3D அனிமேஷனை இயக்கச் செய்தல்
+    if (window.cubeEngine && typeof window.cubeEngine.applyAlgorithm === "function") {
+        window.cubeEngine.applyAlgorithm(moves.join(" "));
+    }
+
+    // 4. Solve Again பட்டன் வேலை செய்ய வைப்பது
     const solveAgainBtn = document.getElementById("solve-again");
     if (solveAgainBtn) {
         solveAgainBtn.onclick = () => window.location.reload();
