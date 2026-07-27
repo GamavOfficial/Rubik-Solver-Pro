@@ -1,208 +1,246 @@
 import * as THREE from "three";
+import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
-/* ============================================================
-   Rubik Solver Pro - Original Restored Logic & Page Switcher
-============================================================ */
+/* ==========================================
+   Rubik Solver Pro - Final Fixed Core Engine
+========================================== */
 
-// 1. global state (பழைய நிலைகள்)
-const FACE_NAMES = ['UP', 'DOWN', 'FRONT', 'BACK', 'LEFT', 'RIGHT'];
-const FACES_MAP = { 'UP': 'U', 'DOWN': 'D', 'FRONT': 'F', 'BACK': 'B', 'LEFT': 'L', 'RIGHT': 'R' };
-
-// ஆரம்பத்தில் அனைத்துக் கட்டங்களும் கருப்பு நிறம் (Default Black)
-const cubeState = {
-    U: Array(9).fill('black'),
-    D: Array(9).fill('black'),
-    F: Array(9).fill('black'),
-    B: Array(9).fill('black'),
-    L: Array(9).fill('black'),
-    R: Array(9).fill('black')
-};
-
-const colorMapHex = {
-    white: 0xffffff,
-    yellow: 0xffff00,
-    red: 0xff0000,
-    orange: 0xff8800,
-    blue: 0x0000ff,
-    green: 0x00aa00,
-    black: 0x111111  // Default Black Color
-};
-
-const appState = {
-    currentFaceIndex: 0, // 0 to 5 (Face 1/6)
-    selectedColor: 'white',
-    filledStickers: 0
-};
-
-// அனிமேஷன் மாறிகள்
-let moveQueue = [];
-let currentMoveIndex = 0;
-let isPlaying = false;
-let isAnimatingSlice = false;
-let autoPlayTimer = null;
-
-// Solver தொடக்கம்
+// Kociemba Initialization
 if (typeof Cube !== 'undefined' && Cube.initSolver) {
-    try { Cube.initSolver(); } catch (e) { console.warn(e); }
+    try {
+        Cube.initSolver();
+    } catch (e) {
+        console.warn("Cube Solver init issue:", e);
+    }
 }
 
-// ------------------------------------------------------------
-// 2. DOM Initialization
-// ------------------------------------------------------------
-document.addEventListener('DOMContentLoaded', () => {
-    initSplashScreen();
-    initThemeSystem();
-    initColorPicker();
-    renderEditorGrid();
-    setupEventListeners();
-    initThreeJS();
-});
+// DOM Elements
+const splashScreen = document.getElementById("splash-screen");
+const mainApp = document.getElementById("main-app");
+const loadingProgress = document.getElementById("loading-progress");
+const toast = document.getElementById("toast");
+
+// App State
+const appState = {
+    currentFace: 0,
+    totalFaces: 6,
+    selectedColor: "white",
+    filledStickers: 0,
+    cubeValidated: false,
+    cubeSolved: false,
+    solving: false
+};
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 function showToast(message) {
-    const toast = document.getElementById("toast");
     if (!toast) return;
     toast.textContent = message;
     toast.classList.add("show");
-    setTimeout(() => toast.classList.remove("show"), 2500);
+    setTimeout(() => {
+        toast.classList.remove("show");
+    }, 2500);
 }
 
-function initSplashScreen() {
-    const splash = document.getElementById("splash-screen");
-    const mainApp = document.getElementById("main-app");
-    if (splash) splash.classList.add("hidden");
+// Splash Screen
+async function startSplash() {
+    let progress = 0;
+    while (progress <= 100) {
+        if (loadingProgress) loadingProgress.style.width = progress + "%";
+        await sleep(15);
+        progress++;
+    }
+
+    if (splashScreen) splashScreen.classList.add("hidden");
     if (mainApp) mainApp.classList.remove("hidden");
+
+    setTimeout(() => {
+        camera.aspect = viewer.clientWidth / viewer.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+        renderer.render(scene, camera);
+    }, 100);
+
+    showToast("Welcome to Rubik Solver Pro");
 }
 
-function initThemeSystem() {
-    const themeBtn = document.getElementById("theme-btn");
-    if (themeBtn) {
-        themeBtn.addEventListener("click", () => {
-            const isDark = document.body.getAttribute("data-theme") === "dark";
-            document.body.setAttribute("data-theme", isDark ? "light" : "dark");
-        });
-    }
-}
+window.addEventListener("load", () => {
+    startSplash();
+});
 
-// ------------------------------------------------------------
-// 3. Color Picker & Face Navigation (Previous / Next)
-// ------------------------------------------------------------
-function initColorPicker() {
-    const colorBtns = document.querySelectorAll('#color-picker .color-btn, .color-bar, [data-color]');
-    colorBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const color = btn.getAttribute('data-color') || btn.dataset.color || btn.style.backgroundColor;
-            if (color) {
-                appState.selectedColor = color.toLowerCase();
-                colorBtns.forEach(b => b.classList.remove('selected', 'active'));
-                btn.classList.add('selected', 'active');
-            }
-        });
+// Theme System
+const themeBtn = document.getElementById("theme-btn");
+let currentTheme = localStorage.getItem("theme") || "dark";
+applyTheme(currentTheme);
+
+if (themeBtn) {
+    themeBtn.addEventListener("click", () => {
+        currentTheme = currentTheme === "dark" ? "light" : "dark";
+        applyTheme(currentTheme);
     });
 }
 
-function renderEditorGrid() {
-    const gridContainer = document.getElementById('cube-grid');
-    const faceText = document.getElementById("cube-face-info") || document.querySelector(".cube-face-text");
-
-    if (faceText) {
-        faceText.textContent = `Cube Face ${appState.currentFaceIndex + 1} / 6`;
-    }
-
-    if (!gridContainer) return;
-    gridContainer.innerHTML = '';
-
-    const currentFaceName = FACE_NAMES[appState.currentFaceIndex];
-    const faceCode = FACES_MAP[currentFaceName];
-    const currentStickers = cubeState[faceCode];
-
-    currentStickers.forEach((color, index) => {
-        const sticker = document.createElement('div');
-        sticker.className = 'sticker';
-        sticker.style.backgroundColor = color === 'black' ? '#222' : color;
-
-        sticker.addEventListener('click', () => {
-            cubeState[faceCode][index] = appState.selectedColor;
-            sticker.style.backgroundColor = appState.selectedColor;
-            updateStickerCounts();
-            syncStateTo3DCube();
-        });
-
-        gridContainer.appendChild(sticker);
-    });
-
-    updateStickerCounts();
+function applyTheme(theme) {
+    document.body.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+    if (themeBtn) themeBtn.textContent = theme === "dark" ? "🌙" : "☀️";
 }
 
-function updateStickerCounts() {
-    let totalFilled = 0;
+// Color Picker
+const colorButtons = document.querySelectorAll(".color-btn");
+
+const colorCounters = {
+    white: document.getElementById("count-white"),
+    yellow: document.getElementById("count-yellow"),
+    red: document.getElementById("count-red"),
+    orange: document.getElementById("count-orange"),
+    blue: document.getElementById("count-blue"),
+    green: document.getElementById("count-green")
+};
+
+const colorUsage = {
+    white: 0,
+    yellow: 0,
+    red: 0,
+    orange: 0,
+    blue: 0,
+    green: 0
+};
+
+setActiveColor("white");
+
+colorButtons.forEach(button => {
+    button.addEventListener("click", () => {
+        const color = button.dataset.color;
+        setActiveColor(color);
+    });
+});
+
+function setActiveColor(color) {
+    appState.selectedColor = color;
+    colorButtons.forEach(btn => btn.classList.remove("active"));
+    const activeBtn = document.querySelector(`[data-color="${color}"]`);
+    if (activeBtn) activeBtn.classList.add("active");
+}
+
+function updateColorCounters() {
+    Object.keys(colorUsage).forEach(color => {
+        if (colorCounters[color]) {
+            colorCounters[color].textContent = `${colorUsage[color]}/9`;
+        }
+        const button = document.querySelector(`[data-color="${color}"]`);
+        if (button) button.disabled = colorUsage[color] >= 9;
+    });
+}
+
+// Cube State Data
+const cubeState = {
+    U: Array(9).fill(null),
+    R: Array(9).fill(null),
+    F: Array(9).fill(null),
+    D: Array(9).fill(null),
+    L: Array(9).fill(null),
+    B: Array(9).fill(null)
+};
+
+const filledCount = document.getElementById("filled-count");
+const validateBtn = document.getElementById("validate-btn");
+const solveBtn = document.getElementById("solve-btn");
+const previousFaceBtn = document.getElementById("previous-face");
+const nextFaceBtn = document.getElementById("next-face");
+
+function updateFaceCounter() {
+    const fc = document.getElementById("face-counter");
+    const fp = document.getElementById("face-progress");
+    if (fc) fc.textContent = `${appState.currentFace + 1} / ${appState.totalFaces}`;
+    if (fp) fp.value = appState.currentFace + 1;
+}
+
+function updateFilledCounter() {
+    let total = 0;
     Object.values(cubeState).forEach(face => {
-        face.forEach(color => {
-            if (color !== 'black') totalFilled++;
+        face.forEach(sticker => {
+            if (sticker !== null) total++;
         });
     });
 
-    appState.filledStickers = totalFilled;
-    const filledCountElem = document.getElementById("filled-count") || document.querySelector(".filled-count");
-    if (filledCountElem) {
-        filledCountElem.textContent = `${totalFilled} / 54`;
-    }
+    appState.filledStickers = total;
+    if (filledCount) filledCount.textContent = `${total} / 54`;
 }
 
-// ------------------------------------------------------------
-// 4. Three.js 3D Cube Engine (Default Black Cubies)
-// ------------------------------------------------------------
-let viewer, scene, camera, renderer, rubiksCube, cubeRotation;
-const cubieSize = 0.95;
-const gap = 0.05;
+function updateValidateButton() {
+    if (validateBtn) validateBtn.disabled = appState.filledStickers !== 54;
+}
 
-function initThreeJS() {
-    viewer = document.getElementById("viewer") || document.querySelector(".3d-cube-editor");
-    if (!viewer) return;
+function validateCube() {
+    const counts = { white: 0, yellow: 0, red: 0, orange: 0, blue: 0, green: 0 };
 
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x101826);
-
-    camera = new THREE.PerspectiveCamera(35, viewer.clientWidth / viewer.clientHeight, 0.1, 1000);
-    camera.position.set(0, 0, 8);
-
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(viewer.clientWidth, viewer.clientHeight);
-    viewer.appendChild(renderer.domElement);
-
-    scene.add(new THREE.AmbientLight(0xffffff, 2));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 2);
-    dirLight.position.set(5, 10, 7);
-    scene.add(dirLight);
-
-    rubiksCube = new THREE.Group();
-
-    // 3D Cubies - ஆரம்பத்தில் கருப்பு நிறத்தில் உருவாக்கப்படுகின்றன
-    for (let x = -1; x <= 1; x++) {
-        for (let y = -1; y <= 1; y++) {
-            for (let z = -1; z <= 1; z++) {
-                const materials = Array(6).fill().map(() => new THREE.MeshStandardMaterial({ color: 0x111111 }));
-                const cubie = new THREE.Mesh(new THREE.BoxGeometry(cubieSize, cubieSize, cubieSize), materials);
-                cubie.position.set(x * (cubieSize + gap), y * (cubieSize + gap), z * (cubieSize + gap));
-                cubie.userData = { x, y, z };
-                rubiksCube.add(cubie);
+    for (const face of Object.keys(cubeState)) {
+        for (const sticker of cubeState[face]) {
+            if (sticker === null) {
+                showToast("Fill all 54 stickers first.");
+                return false;
+            }
+            if (sticker in counts) {
+                counts[sticker]++;
             }
         }
     }
 
-    scene.add(rubiksCube);
-    cubeRotation = new CubeRotation(rubiksCube);
-
-    function animate() {
-        requestAnimationFrame(animate);
-        if (cubeRotation) cubeRotation.update();
-        renderer.render(scene, camera);
+    for (const color of Object.keys(counts)) {
+        if (counts[color] !== 9) {
+            showToast(`Each color must be exactly 9! ${color}: ${counts[color]}`);
+            return false;
+        }
     }
-    animate();
+
+    appState.cubeValidated = true;
+    showToast("Validation successful!");
+    return true;
 }
 
+if (validateBtn) {
+    validateBtn.addEventListener("click", () => {
+        if (validateCube()) {
+            if (solveBtn) {
+                solveBtn.disabled = false;
+                solveBtn.classList.remove("hidden");
+            }
+        }
+    });
+}
+
+if (solveBtn) {
+    solveBtn.addEventListener("click", () => {
+        if (!appState.cubeValidated) {
+            showToast("Validate face first.");
+            return;
+        }
+        solveCube();
+    });
+}
+
+function refreshEditor() {
+    updateFaceCounter();
+    updateFilledCounter();
+    updateValidateButton();
+    updateColorCounters();
+}
+
+refreshEditor();
+if (solveBtn) solveBtn.disabled = true;
+
+/* ==========================================
+   Precision 3D Sticker Indexing
+========================================== */
 function getStickerIndex(cubie, faceLetter) {
-    const { x, y, z } = cubie.userData;
+    const x = cubie.userData.x;
+    const y = cubie.userData.y;
+    const z = cubie.userData.z;
+
     switch (faceLetter) {
         case "U": return (z + 1) * 3 + (x + 1);
         case "D": return (1 - z) * 3 + (x + 1);
@@ -214,165 +252,287 @@ function getStickerIndex(cubie, faceLetter) {
     }
 }
 
-function syncStateTo3DCube() {
-    if (!rubiksCube) return;
-    const faces = ["R", "L", "U", "D", "F", "B"];
+// Three.js Scene Setup
+const viewer = document.getElementById("viewer");
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x101826);
 
-    rubiksCube.children.forEach(cubie => {
-        faces.forEach((faceLetter, faceIndex) => {
-            const idx = getStickerIndex(cubie, faceLetter);
-            if (idx !== -1) {
-                const colorName = cubeState[faceLetter][idx];
-                const hex = colorMapHex[colorName] || 0x111111;
-                cubie.material[faceIndex].color.setHex(hex);
-            }
-        });
+const camera = new THREE.PerspectiveCamera(35, viewer.clientWidth / viewer.clientHeight, 0.1, 1000);
+camera.position.set(0, 0, 8);
+camera.lookAt(0, 0, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+if (viewer) viewer.appendChild(renderer.domElement);
+
+const ambientLight = new THREE.AmbientLight(0xffffff, 2);
+scene.add(ambientLight);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
+directionalLight.position.set(5, 10, 7);
+scene.add(directionalLight);
+
+// Rubik's Cube Mesh Group
+const rubiksCube = new THREE.Group();
+const cubieSize = 0.95;
+const gap = 0.05;
+
+const colorMap = {
+    white: 0xffffff,
+    yellow: 0xffff00,
+    red: 0xff0000,
+    orange: 0xff8800,
+    blue: 0x0000ff,
+    green: 0x00aa00
+};
+
+for (let x = -1; x <= 1; x++) {
+    for (let y = -1; y <= 1; y++) {
+        for (let z = -1; z <= 1; z++) {
+            const materials = Array(6).fill().map(() => new THREE.MeshStandardMaterial({ color: 0x222222 }));
+            const cubie = new THREE.Mesh(new THREE.BoxGeometry(cubieSize, cubieSize, cubieSize), materials);
+            cubie.position.set(x * (cubieSize + gap), y * (cubieSize + gap), z * (cubieSize + gap));
+
+            cubie.userData = {
+                x, y, z,
+                painted: [null, null, null, null, null, null]
+            };
+
+            rubiksCube.add(cubie);
+        }
+    }
+}
+
+scene.add(rubiksCube);
+const cubeRotation = new CubeRotation(rubiksCube);
+
+// Raycaster Click Handler
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+renderer.domElement.addEventListener("pointerdown", onPointerDown);
+
+function onPointerDown(event) {
+    if (isSolvingAnimation) return;
+
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(rubiksCube.children);
+
+    if (intersects.length === 0) return;
+
+    const hit = intersects[0];
+    const cubie = hit.object;
+    const faceIndex = Math.floor(hit.faceIndex / 2);
+    const previousColor = cubie.userData.painted[faceIndex];
+    const faceLetter = ["R", "L", "U", "D", "F", "B"][faceIndex];
+
+    const x = cubie.userData.x;
+    const y = cubie.userData.y;
+    const z = cubie.userData.z;
+
+    if (
+        (faceLetter === "R" && x !== 1) ||
+        (faceLetter === "L" && x !== -1) ||
+        (faceLetter === "U" && y !== 1) ||
+        (faceLetter === "D" && y !== -1) ||
+        (faceLetter === "F" && z !== 1) ||
+        (faceLetter === "B" && z !== -1)
+    ) {
+        return;
+    }
+
+    if (previousColor !== appState.selectedColor && colorUsage[appState.selectedColor] >= 9) {
+        showToast(appState.selectedColor + " limit reached (9/9)");
+        return;
+    }
+
+    if (previousColor === appState.selectedColor) return;
+
+    if (previousColor) colorUsage[previousColor]--;
+
+    cubie.userData.painted[faceIndex] = appState.selectedColor;
+    colorUsage[appState.selectedColor]++;
+    cubie.material[faceIndex].color.setHex(colorMap[appState.selectedColor]);
+
+    const stickerIndex = getStickerIndex(cubie, faceLetter);
+    
+    // Store exact color name
+    cubeState[faceLetter][stickerIndex] = appState.selectedColor;
+
+    updateFilledCounter();
+    updateValidateButton();
+    updateColorCounters();
+
+    showToast(appState.selectedColor + " Applied");
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    cubeRotation.update();
+    renderer.render(scene, camera);
+}
+animate();
+
+const faceRotations = [null, "right", "up", "right", "right", "up"];
+
+if (nextFaceBtn) {
+    nextFaceBtn.addEventListener("click", () => {
+        if (cubeRotation.isAnimating() || appState.currentFace >= 5) return;
+        appState.currentFace++;
+        const move = faceRotations[appState.currentFace];
+        if (move) cubeRotation.rotate(move);
+        updateFaceCounter();
     });
 }
 
-// ------------------------------------------------------------
-// 5. Non-Blocking Solve & Page Transition
-// ------------------------------------------------------------
-function handleSolveCube() {
-    showToast("Calculating Solution...");
-
-    // 1. உடனே Animation Page-க்கு மாறுகிறது (பிரவுசர் Freeze ஆகாது!)
-    switchToAnimationPage();
-
-    // 2. Asynchronous முறையில் தீர்வு உருவாக்கப்படுகிறது
-    setTimeout(() => {
-        let generatedMoves = [];
-
-        try {
-            if (typeof Cube !== 'undefined') {
-                const cubeString = buildCubeString();
-                const cube = Cube.fromString(cubeString);
-                if (!cube.isSolved()) {
-                    const sol = cube.solve(20);
-                    if (sol) generatedMoves = sol.trim().split(/\s+/);
-                }
-            }
-        } catch (err) {
-            console.warn("Solving fallback active");
-        }
-
-        if (generatedMoves.length === 0) {
-            generatedMoves = generateRandomQueue();
-        }
-
-        moveQueue = generatedMoves;
-        currentMoveIndex = 0;
-        updateAnimationUI();
-        showToast(`Solution Ready (${moveQueue.length} moves)`);
-    }, 150);
+if (previousFaceBtn) {
+    previousFaceBtn.addEventListener("click", () => {
+        if (cubeRotation.isAnimating() || appState.currentFace <= 0) return;
+        const move = faceRotations[appState.currentFace];
+        if (move === "right") cubeRotation.rotate("left");
+        else if (move === "up") cubeRotation.rotate("down");
+        appState.currentFace--;
+        updateFaceCounter();
+    });
 }
 
-function buildCubeString() {
+window.addEventListener("resize", () => {
+    camera.aspect = viewer.clientWidth / viewer.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+});
+
+/* ==========================================
+   DYNAMIC CENTER KOCIEMBA CONVERTER
+========================================== */
+function getCubeString() {
     const faces = ["U", "R", "F", "D", "L", "B"];
-    let str = "";
-    faces.forEach(f => {
-        cubeState[f].forEach(color => {
-            str += color !== 'black' ? color[0].toUpperCase() : 'U';
-        });
-    });
-    return str;
+    
+    // Dynamic Center Color Map Construction
+    const centerToFaceMap = {};
+    for (const face of faces) {
+        const centerColor = cubeState[face][4]; // Index 4 is center piece
+        if (!centerColor) {
+            throw new Error(`Center color for face ${face} is missing!`);
+        }
+        centerToFaceMap[centerColor] = face;
+    }
+
+    if (Object.keys(centerToFaceMap).length !== 6) {
+        throw new Error("Each face center must have a unique color!");
+    }
+
+    let kociembaString = "";
+    for (const face of faces) {
+        for (let i = 0; i < 9; i++) {
+            const color = cubeState[face][i];
+            const facelet = centerToFaceMap[color];
+            if (!facelet) {
+                throw new Error(`Unmapped color detected on face ${face}`);
+            }
+            kociembaString += facelet;
+        }
+    }
+
+    return kociembaString;
 }
 
-function generateRandomQueue() {
-    const moves = ["R", "U", "R'", "U'", "L", "F", "B", "D", "R2", "U2", "F2"];
-    const len = Math.floor(Math.random() * 6) + 10;
-    return Array.from({ length: len }, () => moves[Math.floor(Math.random() * moves.length)]);
-}
+let isSolvingAnimation = false;
 
-// Editor View -> Animation View Transition
-function switchToAnimationPage() {
-    const editorEl = document.getElementById('editor-page') || document.querySelector('.editor-container') || document.querySelector('.3d-cube-editor')?.parentElement;
-    const animEl = document.getElementById('animation-page') || document.querySelector('.animation-container') || document.querySelector('.animation-page');
+async function solveCube() {
+    if (isSolvingAnimation) return;
 
-    if (editorEl) editorEl.style.display = 'none';
-    if (animEl) {
-        animEl.style.display = 'block';
-        animEl.classList.remove('hidden');
+    try {
+        if (typeof Cube === 'undefined') {
+            showToast("Solver library not loaded!");
+            return;
+        }
+
+        const cubeString = getCubeString();
+        console.log("Generated Kociemba String:", cubeString);
+
+        showToast("Calculating Solution...");
+        isSolvingAnimation = true;
+        if (solveBtn) solveBtn.disabled = true;
+        if (validateBtn) validateBtn.disabled = true;
+
+        // Reset View Orientation before starting animation
+        rubiksCube.quaternion.set(0, 0, 0, 1);
+        appState.currentFace = 0;
+        updateFaceCounter();
+
+        // Non-blocking asynchronous calculation delay
+        setTimeout(() => {
+            try {
+                const cube = Cube.fromString(cubeString);
+
+                if (cube.isSolved()) {
+                    showToast("Cube is already solved!");
+                    resetSolveState();
+                    return;
+                }
+
+                // Solve with max 22 moves search depth
+                const solution = cube.solve(22);
+                console.log("Solution:", solution);
+
+                if (!solution || solution.trim() === "") {
+                    showToast("Cube is already solved!");
+                    resetSolveState();
+                    return;
+                }
+
+                const moves = solution.trim().split(/\s+/);
+                showToast(`Solved in ${moves.length} moves! Animating...`);
+
+                playSolutionQueue(moves);
+            } catch (solveErr) {
+                console.error("Solve Execution Error:", solveErr);
+                showToast("Invalid Cube Layout! Please check sticker colors.");
+                resetSolveState();
+            }
+        }, 150);
+
+    } catch (e) {
+        console.error("String Build Error:", e.message);
+        showToast(e.message || "Ensure all 54 stickers are filled!");
+        resetSolveState();
     }
 }
 
-function switchToEditorPage() {
-    pauseAutoPlay();
-    const editorEl = document.getElementById('editor-page') || document.querySelector('.editor-container') || document.querySelector('.3d-cube-editor')?.parentElement;
-    const animEl = document.getElementById('animation-page') || document.querySelector('.animation-container') || document.querySelector('.animation-page');
-
-    if (animEl) animEl.style.display = 'none';
-    if (editorEl) editorEl.style.display = 'block';
+function resetSolveState() {
+    isSolvingAnimation = false;
+    if (solveBtn) solveBtn.disabled = false;
+    if (validateBtn) validateBtn.disabled = false;
 }
 
-// ------------------------------------------------------------
-// 6. Animation Controls (Next, Prev, Play, Pause)
-// ------------------------------------------------------------
-function updateAnimationUI() {
-    const currentIdxElem = document.getElementById('current-move-index');
-    const totalElem = document.getElementById('total-moves');
-    const queueBox = document.getElementById('move-queue-display') || document.querySelector('.move-queue');
+/* ==========================================
+   3D SLICE ROTATION ENGINE
+========================================== */
+function playSolutionQueue(moves) {
+    let index = 0;
 
-    if (currentIdxElem) currentIdxElem.innerText = currentMoveIndex;
-    if (totalElem) totalElem.innerText = moveQueue.length;
+    function nextMove() {
+        if (index >= moves.length) {
+            showToast("Cube Solved Successfully! 🎉");
+            resetSolveState();
+            appState.cubeSolved = true;
+            return;
+        }
 
-    if (queueBox) {
-        queueBox.innerHTML = moveQueue.map((m, idx) => {
-            return idx === currentMoveIndex - 1 ? `<b style="color:#00ff00;">${m}</b>` : `<span>${m}</span>`;
-        }).join(" ");
+        const move = moves[index++];
+        rotateSlice(move, () => setTimeout(nextMove, 180));
     }
+
+    nextMove();
 }
 
-function nextMove() {
-    if (currentMoveIndex < moveQueue.length && !isAnimatingSlice) {
-        const move = moveQueue[currentMoveIndex];
-        currentMoveIndex++;
-        rotateSlice(move, () => updateAnimationUI());
-    } else {
-        pauseAutoPlay();
-    }
-}
-
-function previousMove() {
-    if (currentMoveIndex > 0 && !isAnimatingSlice) {
-        currentMoveIndex--;
-        const move = moveQueue[currentMoveIndex];
-        const inv = move.includes("'") ? move[0] : (move.includes("2") ? move : move + "'");
-        rotateSlice(inv, () => updateAnimationUI());
-    }
-}
-
-function toggleAutoPlay() {
-    if (isPlaying) pauseAutoPlay();
-    else startAutoPlay();
-}
-
-function startAutoPlay() {
-    if (currentMoveIndex >= moveQueue.length) currentMoveIndex = 0;
-    isPlaying = true;
-    const playBtn = document.getElementById('play-btn');
-    if (playBtn) playBtn.innerText = "Pause";
-
-    autoPlayTimer = setInterval(() => {
-        if (currentMoveIndex < moveQueue.length && !isAnimatingSlice) nextMove();
-        else pauseAutoPlay();
-    }, 800);
-}
-
-function pauseAutoPlay() {
-    isPlaying = false;
-    const playBtn = document.getElementById('play-btn');
-    if (playBtn) playBtn.innerText = "Play";
-    if (autoPlayTimer) clearInterval(autoPlayTimer);
-}
-
-// ------------------------------------------------------------
-// 7. 3D Rotation Animation
-// ------------------------------------------------------------
 function rotateSlice(moveStr, callback) {
-    if (!rubiksCube || !scene) { if (callback) callback(); return; }
-    isAnimatingSlice = true;
-
     const face = moveStr[0];
     const modifier = moveStr.slice(1);
 
@@ -394,16 +554,22 @@ function rotateSlice(moveStr, callback) {
     scene.add(pivot);
 
     const targets = [];
-    rubiksCube.children.forEach(c => {
-        if (Math.abs(c.position[axis] - layerVal) < 0.2) targets.push(c);
+    rubiksCube.children.forEach(cubie => {
+        if (Math.abs(cubie.position[axis] - layerVal) < 0.2) {
+            targets.push(cubie);
+        }
     });
 
     targets.forEach(c => pivot.attach(c));
 
     let start = null;
+    const duration = 200;
+
     function animateTurn(timestamp) {
         if (!start) start = timestamp;
-        const progress = Math.min((timestamp - start) / 200, 1);
+        const elapsed = timestamp - start;
+        const progress = Math.min(elapsed / duration, 1);
+
         pivot.rotation[axis] = angle * progress;
 
         if (progress < 1) {
@@ -411,54 +577,18 @@ function rotateSlice(moveStr, callback) {
         } else {
             pivot.rotation[axis] = angle;
             pivot.updateMatrixWorld();
-            targets.forEach(c => rubiksCube.attach(c));
+
+            targets.forEach(c => {
+                rubiksCube.attach(c);
+                c.position.x = Math.round(c.position.x * 100) / 100;
+                c.position.y = Math.round(c.position.y * 100) / 100;
+                c.position.z = Math.round(c.position.z * 100) / 100;
+            });
+
             scene.remove(pivot);
-            isAnimatingSlice = false;
             if (callback) callback();
         }
     }
+
     requestAnimationFrame(animateTurn);
-}
-
-// ------------------------------------------------------------
-// 8. Event Listeners Setup
-// ------------------------------------------------------------
-function setupEventListeners() {
-    // Face Switching (Previous / Next Buttons under Color Picker)
-    const prevFaceBtns = document.querySelectorAll('#prev-face-btn, .face-prev, button:contains("Previous")');
-    const nextFaceBtns = document.querySelectorAll('#next-face-btn, .face-next, button:contains("Next")');
-
-    // UI-இல் உள்ள Previous / Next பொத்தான்களுக்கான Event Binding
-    document.querySelectorAll('button').forEach(btn => {
-        const txt = btn.textContent.trim().toLowerCase();
-        if (txt.includes('previous') || txt.includes('⏮')) {
-            btn.addEventListener('click', () => {
-                appState.currentFaceIndex = (appState.currentFaceIndex - 1 + 6) % 6;
-                renderEditorGrid();
-            });
-        }
-        if (txt.includes('next') || txt.includes('⏭')) {
-            btn.addEventListener('click', () => {
-                appState.currentFaceIndex = (appState.currentFaceIndex + 1) % 6;
-                renderEditorGrid();
-            });
-        }
-        if (txt.includes('validate')) {
-            btn.addEventListener('click', () => showToast("Validation Successful!"));
-        }
-        if (txt.includes('solve')) {
-            btn.addEventListener('click', handleSolveCube);
-        }
-    });
-
-    // Animation Controls
-    const animNext = document.getElementById('next-btn');
-    const animPrev = document.getElementById('prev-btn');
-    const playBtn = document.getElementById('play-btn');
-    const backBtn = document.getElementById('back-btn');
-
-    if (animNext) animNext.addEventListener('click', nextMove);
-    if (animPrev) animPrev.addEventListener('click', previousMove);
-    if (playBtn) playBtn.addEventListener('click', toggleAutoPlay);
-    if (backBtn) backBtn.addEventListener('click', switchToEditorPage);
 }
