@@ -1,18 +1,15 @@
 // =====================================================
-// js/cube-rotation.js (Full Complete Code)
+// js/cube-rotation.js (Complete & Untouched Logic)
 // =====================================================
 
-// [REMOVE OLD IMPORT IF ANY / ADD NEW IMPORT]
 import * as THREE from "three";
 
 export class CubeRotation {
     constructor(rubiksCube) {
-        // [REPLACE] Safe assignment for cube reference
         this.cube = rubiksCube;
         this.animating = false;
         this.rotationSpeed = 0.12;
         
-        // [ADD] Safety checks for quaternion initialization to avoid null crashes
         if (this.cube && this.cube.quaternion) {
             this.currentQuaternion = this.cube.quaternion.clone();
             this.targetQuaternion = this.cube.quaternion.clone();
@@ -45,7 +42,6 @@ export class CubeRotation {
     }
 
     previous() {
-        // [REPLACE] Added null check for cube
         if (this.animating || this.history.length === 0 || !this.cube) return;
 
         this.animating = true;
@@ -62,7 +58,6 @@ export class CubeRotation {
     }
 
     rotate(direction) {
-        // [REPLACE] Added null check for cube
         if (this.animating || !this.cube) return;
 
         this.animating = true;
@@ -110,7 +105,6 @@ export class CubeRotation {
     }
 
     update() {
-        // [REPLACE] Added null check for cube
         if (!this.animating || !this.cube) return;
 
         this.cube.quaternion.slerp(
