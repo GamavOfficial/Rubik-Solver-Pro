@@ -72,40 +72,34 @@ async function startSplash() {
 
     let progress = 0;
 
-    while (progress <= 100) {
-
+    const interval = setInterval(() => {
+        progress += 4;
+        if (progress > 100) {
+            progress = 100;
+            clearInterval(interval);
+        }
         loadingProgress.style.width = progress + "%";
+    }, 20);
 
-        await sleep(25);
+    // 3 விநாடிகள் அல்லது அசெட் லோட் ஆனதும் ஸ்பேஸை மறைக்க
+    await sleep(1500);
 
-        progress++;
+    splashScreen.classList.add("hidden");
+    mainApp.classList.remove("hidden");
 
+    try {
+        camera.aspect = viewer.clientWidth / viewer.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+        renderer.render(scene, camera);
+    } catch (e) {
+        console.error(e);
     }
 
-splashScreen.classList.add("hidden");
-
-mainApp.classList.remove("hidden");
-
-setTimeout(() => {
-
-    camera.aspect =
-        viewer.clientWidth /
-        viewer.clientHeight;
-
-    camera.updateProjectionMatrix();
-
-    renderer.setSize(
-        viewer.clientWidth,
-        viewer.clientHeight
-    );
-
-    renderer.render(scene, camera);
-
-}, 100);
-
-showToast("Welcome to Rubik Solver Pro");
+    showToast("Welcome to Rubik Solver Pro");
 
 }
+
 
 // ---------- Start App ----------
 
@@ -1059,4 +1053,3 @@ function playSolutionQueue(moves) {
 
     executeNextMove();
 }
-
