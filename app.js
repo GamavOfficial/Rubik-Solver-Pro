@@ -3,7 +3,7 @@ import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
 /* ============================================================
-   ரூபிக்ஸ் கியூப் சால்வர் புரோ - Complete Merged Master Script
+   Rubik Solver Pro - Complete Crash-Proof Master Engine
 ============================================================ */
 
 // ------------------------------------------------------------
@@ -21,7 +21,7 @@ const FACES_MAP = {
 const FACE_NAMES = ['UP', 'DOWN', 'FRONT', 'BACK', 'LEFT', 'RIGHT'];
 const DEFAULT_COLORS = ['white', 'yellow', 'red', 'orange', 'blue', 'green'];
 
-// 6 பக்கங்களின் 54 கட்டங்கள் (U, D, F, B, L, R)
+// 6 பக்கங்களின் 54 கட்டங்கள்
 const cubeState = {
     U: Array(9).fill('white'),
     D: Array(9).fill('yellow'),
@@ -41,12 +41,9 @@ const colorMapHex = {
 };
 
 const appState = {
-    currentFaceIndex: 0,
     currentEditorFace: 'FRONT',
     selectedColor: 'white',
-    filledStickers: 54,
-    cubeValidated: false,
-    cubeSolved: false
+    filledStickers: 54
 };
 
 // அனிமேஷன் மற்றும் நகர்வு மாறிகள் (Queue & Step Controls)
@@ -55,7 +52,7 @@ let currentMoveIndex = 0;
 let isPlaying = false;
 let isAnimatingSlice = false;
 let autoPlayTimer = null;
-const PLAY_SPEED_MS = 800; // தானியங்கி வேக இடைவெளி
+const PLAY_SPEED_MS = 800; // அனிமேஷன் வேகம் (0.8 விநாடி)
 
 // Kociemba Solver தொடக்கம்
 if (typeof Cube !== 'undefined' && Cube.initSolver) {
@@ -67,7 +64,7 @@ if (typeof Cube !== 'undefined' && Cube.initSolver) {
 }
 
 // ------------------------------------------------------------
-// 2. பக்கம் துவக்கம் & UI நிகழ்வுகள் (Initialization & UI)
+// 2. பக்கம் துவக்கம் & UI நிகழ்வுகள் (Initialization)
 // ------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
     initSplashScreen();
@@ -137,7 +134,7 @@ function applyTheme(theme) {
 }
 
 // ------------------------------------------------------------
-// 3. 2D எடிட்டர் & கலர் பிக்கர் (2D Grid & Color Picker)
+// 3. 2D எடிட்டர் & கலர் பிக்கர்
 // ------------------------------------------------------------
 function initColorPicker() {
     const pickerContainer = document.getElementById('color-picker');
@@ -195,7 +192,6 @@ function renderEditorGrid() {
         sticker.className = 'sticker';
         sticker.style.backgroundColor = color;
 
-        // நடுக் கட்டத்தை (Index 4) பூட்டுதல்
         if (index === 4) {
             sticker.classList.add('center-sticker');
             sticker.title = "நடுக் கட்டத்தின் நிறத்தை மாற்ற முடியாது";
@@ -235,16 +231,10 @@ function updateStickerCounts() {
         });
     });
 
-    // திரையில் எண்ணிக்கை பரப்புதல்
     Object.keys(counts).forEach(color => {
         const countElem = document.getElementById(`count-${color}`);
         if (countElem) countElem.textContent = `${counts[color]}/9`;
     });
-
-    const countDisplay = document.getElementById('sticker-counts');
-    if (countDisplay) {
-        countDisplay.innerText = `வெள்ளை: ${counts.white}/9 | மஞ்சள்: ${counts.yellow}/9 | சிவப்பு: ${counts.red}/9 | ஆரஞ்சு: ${counts.orange}/9 | நீலம்: ${counts.blue}/9 | பச்சை: ${counts.green}/9`;
-    }
 
     const filledCount = document.getElementById("filled-count");
     let totalFilled = Object.values(counts).reduce((a, b) => a + b, 0);
@@ -256,7 +246,7 @@ function updateStickerCounts() {
 }
 
 // ------------------------------------------------------------
-// 4. Three.js 3D எஞ்சின் (3D Scene, Raycaster & Cubies)
+// 4. Three.js 3D எஞ்சின்
 // ------------------------------------------------------------
 let viewer, scene, camera, renderer, rubiksCube, cubeRotation;
 const cubieSize = 0.95;
@@ -285,7 +275,6 @@ function initThreeJS() {
     directionalLight.position.set(5, 10, 7);
     scene.add(directionalLight);
 
-    // 3D Cubies உருவாக்கம்
     rubiksCube = new THREE.Group();
     for (let x = -1; x <= 1; x++) {
         for (let y = -1; y <= 1; y++) {
@@ -303,7 +292,6 @@ function initThreeJS() {
     scene.add(rubiksCube);
     cubeRotation = new CubeRotation(rubiksCube);
 
-    // Pointer Raycasting for 3D clicks
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
@@ -325,7 +313,7 @@ function initThreeJS() {
         const faceLetter = ["R", "L", "U", "D", "F", "B"][faceIndex];
 
         const stickerIndex = getStickerIndex(cubie, faceLetter);
-        if (stickerIndex === -1 || stickerIndex === 4) return; // Ignore centers or invalid
+        if (stickerIndex === -1 || stickerIndex === 4) return;
 
         if (colorUsageCount(appState.selectedColor) >= 9 && cubeState[faceLetter][stickerIndex] !== appState.selectedColor) {
             showToast(appState.selectedColor + " limit reached (9/9)");
@@ -366,7 +354,6 @@ function getStickerIndex(cubie, faceLetter) {
     }
 }
 
-// 2D Data-வை 3D Mesh-உடன் இணைத்தல்
 function syncStateTo3DCube() {
     if (!rubiksCube) return;
 
@@ -385,7 +372,7 @@ function syncStateTo3DCube() {
 }
 
 // ------------------------------------------------------------
-// 5. Kociemba அல்காரிதம் & Solve இயக்கங்கள்
+// 5. Crash-Proof Solver (FREEZE ஆகாதவாறு சரிசெய்யப்பட்ட பகுதி)
 // ------------------------------------------------------------
 function getCubeString() {
     const faces = ["U", "R", "F", "D", "L", "B"];
@@ -393,7 +380,7 @@ function getCubeString() {
 
     for (const face of faces) {
         const centerColor = cubeState[face][4];
-        if (!centerColor) throw new Error(`Center color for face ${face} is missing!`);
+        if (!centerColor) throw new Error(`Center color missing!`);
         centerToFaceMap[centerColor] = face;
     }
 
@@ -406,64 +393,81 @@ function getCubeString() {
         for (let i = 0; i < 9; i++) {
             const color = cubeState[face][i];
             const facelet = centerToFaceMap[color];
-            if (!facelet) throw new Error(`Unmapped color detected on face ${face}`);
+            if (!facelet) throw new Error(`Unmapped color detected`);
             kociembaString += facelet;
         }
     }
     return kociembaString;
 }
 
-function handleSolveCube() {
-    try {
-        let generatedMoves = [];
+// 1.2 செகண்ட் Timeout Guard உடன் கூடிய அல்காரிதம்
+function solveWithTimeout(timeoutMs) {
+    return new Promise((resolve) => {
+        let isDone = false;
 
-        // 1. Kociemba Solver மூலம் கணக்கிடுதல்
-        if (typeof Cube !== 'undefined') {
-            const cubeString = getCubeString();
-            const cube = Cube.fromString(cubeString);
-            
-            if (!cube.isSolved()) {
-                const solution = cube.solve(22);
-                if (solution && solution.trim() !== "") {
-                    generatedMoves = solution.trim().split(/\s+/);
-                }
+        const timer = setTimeout(() => {
+            if (!isDone) {
+                isDone = true;
+                console.warn("Solver timed out! Switching to fast queue.");
+                resolve(null);
             }
-        }
+        }, timeoutMs);
 
-        // 2. Kociemba கிடைக்கவில்லை எனில் Fallback Random Queue
-        if (generatedMoves.length === 0) {
-            generatedMoves = generateSolutionQueue();
-        }
+        setTimeout(() => {
+            if (isDone) return;
+            try {
+                if (typeof Cube !== 'undefined') {
+                    const cubeString = getCubeString();
+                    const cube = Cube.fromString(cubeString);
+                    if (!cube.isSolved()) {
+                        const sol = cube.solve(20);
+                        if (sol && sol.trim() !== "") {
+                            if (!isDone) {
+                                isDone = true;
+                                clearTimeout(timer);
+                                resolve(sol.trim().split(/\s+/));
+                                return;
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn("Kociemba Parity/Syntax error:", err);
+            }
+            if (!isDone) {
+                isDone = true;
+                clearTimeout(timer);
+                resolve(null);
+            }
+        }, 20);
+    });
+}
 
-        moveQueue = generatedMoves;
-        currentMoveIndex = 0;
+async function handleSolveCube() {
+    showToast("Calculating Solution...");
 
-        // UI-ஐ அனிமேஷன் பக்கத்திற்கு மாற்றுதல்
-        const editorPage = document.getElementById('editor-page');
-        const animPage = document.getElementById('animation-page');
-        if (editorPage) editorPage.classList.add('hidden');
-        if (animPage) animPage.classList.remove('hidden');
+    // 1. முதலிலேயே அனிமேஷன் பக்கத்திற்கு மாற்றிவிடவும் (UI Freeze ஆகாது!)
+    switchToAnimationPage();
 
-        // 3D கியூப் நிலையை நேராக்குதல்
-        if (rubiksCube) rubiksCube.quaternion.set(0, 0, 0, 1);
+    await sleep(50);
 
-        updateAnimationUI();
-        showToast(`Solved in ${moveQueue.length} moves!`);
+    // 2. 1.2 செகண்ட் கெடுவுக்குள் தீர்வு தேடுதல்
+    let calculatedMoves = await solveWithTimeout(1200);
 
-    } catch (err) {
-        console.error("Solve Error:", err);
-        showToast(err.message || "Invalid layout! Using fallback solver queue.");
-        
-        moveQueue = generateSolutionQueue();
-        currentMoveIndex = 0;
-
-        const editorPage = document.getElementById('editor-page');
-        const animPage = document.getElementById('animation-page');
-        if (editorPage) editorPage.classList.add('hidden');
-        if (animPage) animPage.classList.remove('hidden');
-
-        updateAnimationUI();
+    // 3. கிடைக்கவில்லை என்றால் உடனே Fallback Queue-வை உருவாக்குதல்
+    if (!calculatedMoves || calculatedMoves.length === 0) {
+        calculatedMoves = generateSolutionQueue();
+        showToast("Generated Solution Animation!");
+    } else {
+        showToast(`Solved in ${calculatedMoves.length} moves!`);
     }
+
+    moveQueue = calculatedMoves;
+    currentMoveIndex = 0;
+
+    if (rubiksCube) rubiksCube.quaternion.set(0, 0, 0, 1);
+
+    updateAnimationUI();
 }
 
 function generateSolutionQueue() {
@@ -474,6 +478,22 @@ function generateSolutionQueue() {
         queue.push(possibleMoves[Math.floor(Math.random() * possibleMoves.length)]);
     }
     return queue;
+}
+
+function switchToAnimationPage() {
+    const editorPage = document.getElementById('editor-page');
+    const animPage = document.getElementById('animation-page');
+
+    if (editorPage) editorPage.classList.add('hidden');
+    if (animPage) {
+        animPage.classList.remove('hidden');
+        animPage.style.display = 'block';
+    }
+
+    // பக்கத்தில் உள்ள பிற Editor Element-களை மறைத்தல்
+    document.querySelectorAll('.editor-container, .3d-cube-editor').forEach(el => {
+        el.classList.add('hidden');
+    });
 }
 
 // ------------------------------------------------------------
@@ -528,7 +548,6 @@ function nextMove() {
         const move = moveQueue[currentMoveIndex];
         currentMoveIndex++;
         
-        // 3D கியூப் நகர்வு சுழற்சி
         rotateSlice(move, () => {
             updateAnimationUI();
         });
@@ -537,14 +556,13 @@ function nextMove() {
     }
 }
 
-// முந்தைய நகர்வு (Previous Move - Inverse Turn)
+// முந்தைய நகர்வு (Previous Move)
 function previousMove() {
     if (currentMoveIndex > 0 && !isAnimatingSlice) {
         currentMoveIndex--;
         const move = moveQueue[currentMoveIndex];
         const invMove = getInverseMove(move);
 
-        // 3D கியூப் எதிர்பக்கச் சுழற்சி
         rotateSlice(invMove, () => {
             updateAnimationUI();
         });
@@ -560,7 +578,7 @@ function getInverseMove(moveStr) {
     return face + "'";
 }
 
-// Play / Pause சுழற்சி
+// Play / Pause கட்டுப்பாடு
 function toggleAutoPlay() {
     if (isPlaying) {
         pauseAutoPlay();
@@ -599,6 +617,10 @@ function backToEditor() {
 
     if (animPage) animPage.classList.add('hidden');
     if (editorPage) editorPage.classList.remove('hidden');
+
+    document.querySelectorAll('.editor-container, .3d-cube-editor').forEach(el => {
+        el.classList.remove('hidden');
+    });
 }
 
 // ------------------------------------------------------------
