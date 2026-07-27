@@ -72,46 +72,39 @@ function showToast(message) {
 
 }
 
-// ---------- Splash Loading ----------
+// ---------- Splash Loading (Fixed & Fast) ----------
 
 async function startSplash() {
-
     let progress = 0;
 
     while (progress <= 100) {
-
-        loadingProgress.style.width = progress + "%";
-
-        await sleep(25);
-
-        progress++;
-
+        if (loadingProgress) {
+            loadingProgress.style.width = progress + "%";
+        }
+        await sleep(15);
+        progress += 5;
     }
 
-splashScreen.classList.add("hidden");
+    if (splashScreen) {
+        splashScreen.style.display = "none";
+        splashScreen.classList.add("hidden");
+    }
+    
+    if (mainApp) {
+        mainApp.classList.remove("hidden");
+        mainApp.style.display = "block";
+    }
 
-mainApp.classList.remove("hidden");
+    setTimeout(() => {
+        camera.aspect = viewer.clientWidth / viewer.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+        renderer.render(scene, camera);
+    }, 100);
 
-setTimeout(() => {
-
-    camera.aspect =
-        viewer.clientWidth /
-        viewer.clientHeight;
-
-    camera.updateProjectionMatrix();
-
-    renderer.setSize(
-        viewer.clientWidth,
-        viewer.clientHeight
-    );
-
-    renderer.render(scene, camera);
-
-}, 100);
-
-showToast("Welcome to Rubik Solver Pro");
-
+    showToast("Welcome to Rubik Solver Pro");
 }
+
 
 // ---------- Start App ----------
 
