@@ -485,7 +485,7 @@ validateBtn.addEventListener("click", () => {
 });
 
 /* ==========================================
-   Solve Button Event
+   Solve Button Event & Function (Updated)
 ========================================== */
 
 solveBtn.addEventListener("click", () => {
@@ -495,9 +495,17 @@ solveBtn.addEventListener("click", () => {
         return;
     }
 
+    // 1. எடிட்டர் பக்கத்தை மறைத்து, சால்வர் பக்கத்தை (Solver Page) வெளிப்படுத்த
+    if (typeof editorPage !== "undefined" && typeof solverPage !== "undefined") {
+        editorPage.classList.add("hidden");
+        solverPage.classList.remove("hidden");
+    }
+
+    // 2. கியூப் சால்வ் செய்து அனிமேஷனைத் தொடங்குவது
     solveCube(cubeState);
 
 });
+
 
 /* ==========================================
    Refresh UI
