@@ -426,3 +426,76 @@ window.loadSolution = function(moves) {
         solveAgainBtn.onclick = () => window.location.reload();
     }
 };
+
+
+// Solution Navigation Variables
+let currentMoveIndex = 0;
+let solutionMoves = [];
+
+// window.loadSolution எக்சிட் ஆகும் போது மூவ்களை ஸ்டோர் செய்துகொள்ளலாம்
+const originalLoadSolution = window.loadSolution;
+window.loadSolution = function(moves) {
+    solutionMoves = moves;
+    currentMoveIndex = 0;
+    originalLoadSolution(moves);
+    updateMoveDisplay();
+};
+
+function updateMoveDisplay() {
+    const moveCounter = document.getElementById("move-counter");
+    const currentMoveEl = document.getElementById("current-move");
+    
+    if (moveCounter) {
+        moveCounter.textContent = `Move ${currentMoveIndex + 1} / ${solutionMoves.length}`;
+    }
+    if (currentMoveEl) {
+        currentMoveEl.textContent = solutionMoves[currentMoveIndex] || "-";
+    }
+}
+
+// Next Button Click - Forward Move Animation
+const nextMoveBtn = document.getElementById("next-move-btn") || document.querySelector("button:has-text('Next')") || document.getElementById("nextFace") /* உங்கள் HTML ஐடியின்படி மாற்றிக்கொள்ளவும் */;
+const prevMoveBtn = document.getElementById("prev-move-btn") || document.querySelector("button:has-text('Previous')");
+
+// HTML-ல் உள்ள Next மற்றும் Previous பட்டன்களை சரியாகக் கண்டறிந்து ஈவென்ட் இணைத்தல்
+document.addEventListener("click", (e) => {
+    // Next பட்டன் கிளிக் செய்யும்போது
+    if (e.target && (e.target.id === "next-btn" || e.target.textContent.includes("Next"))) {
+        if (currentMoveIndex < solutionMoves.length - 1) {
+            currentMoveIndex++;
+            const move = solutionMoves[currentMoveIndex];
+            updateMoveDisplay();
+            
+            // கியூப் இன்ஜின் மூலம் குறிப்பிட்ட மூவ் அனிமேஷனை இயக்குவது
+            if (window.cubeEngine && typeof window.cubeEngine.applyMove === "function") {
+                window.cubeEngine.applyMove(move, false); // false = Forward
+            }
+        }
+    }
+
+    // Previous பட்டன் கிளிக் செய்யும்போது (Reverse Animation)
+    if (e.target && (e.target.id === "previous-btn" || e.target.textContent.includes("Previous"))) {
+        if (currentMoveIndex > 0) {
+            const move = solutionMoves[currentMoveIndex];
+            currentMoveIndex--;
+            updateMoveDisplay();
+            
+            // ரிவர்ஸ் மூவ் (உதாரணமாக R என்றால் R' ஆக மாற்றி பின்னோக்கி நகர்த்துவது)
+            const inverseMove = getInverseMove(move);
+            if (window.cubeEngine && typeof window.cubeEngine.applyMove === "function") {
+                window.cubeEngine.applyMove(inverseMove, true); // true = Reverse
+            }
+        }
+    }
+});
+
+// ஒரு மூவின் எதிர்மறை மூவை (Inverse Move) கண்டறியும் ஃபங்ஷன் (உ-ம்: R -> R', R2 -> R2, U' -> U)
+function getInverseMove(move) {
+    if (move.endsWith("'")) {
+        return move.slice(0, -1);
+    } else if (move.endsWith("2")) {
+        return move;
+    } else {
+        return move + "'";
+    }
+}
