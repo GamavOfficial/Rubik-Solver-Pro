@@ -1,7 +1,7 @@
-// =======================================
+// =====================================================
 // Rubik Solver Pro
-// js/solver.js
-// =======================================
+// js/solver.js (Complete Integrated Code)
+// =====================================================
 
 let solutionMoves = [];
 let solverReady = false;
@@ -12,55 +12,40 @@ let solverReady = false;
 function initializeSolver() {
     if (solverReady) return;
 
-    if (typeof Cube !== 'undefined' && Cube.initSolver) {
+    if (typeof Cube !== 'undefined' && typeof Cube.initSolver === 'function') {
         Cube.initSolver();
         solverReady = true;
     }
 }
 
 /**
- * Convert 3D Cube / Editor State to 54-character Kociemba String (U R F D L B)
+ * [REPLACE] Convert CubeEngine stickers to 54-character Kociemba String (U R F D L B)
  */
 function getCubeString() {
-    // 1. window.getCubeString ஃபங்க்ஷன் இருந்தால் அதை முதன்மையாகப் பயன்படுத்துதல்
-    if (typeof window.getCubeString === 'function') {
-        try {
-            return window.getCubeString();
-        } catch (e) {
-            console.warn("Global getCubeString error:", e);
-        }
-    }
-
-    // 2. window.cubeEngine மூலம் 3D Cube Engine-இல் இருந்து String-ஐப் பெறுதல்
-    if (window.cubeEngine && typeof window.cubeEngine.getCubeString === 'function') {
-        try {
-            return window.cubeEngine.getCubeString();
-        } catch (e) {
-            console.warn("CubeEngine getCubeString error:", e);
-        }
-    }
-
-    // 3. Fallback: window.cubeState-ஐப் பயன்படுத்துதல்
-    if (window.cubeState) {
+    // Check if cubeEngine and its stickers exist in the global scope
+    if (window.cubeEngine && window.cubeEngine.stickers && window.cubeEngine.stickers.length > 0) {
         const faceOrder = ['U', 'R', 'F', 'D', 'L', 'B'];
         let cubeString = "";
 
         faceOrder.forEach(face => {
-            if (window.cubeState[face]) {
-                window.cubeState[face].forEach(sticker => {
-                    cubeString += sticker;
-                });
-            }
+            const faceStickers = window.cubeEngine.stickers.filter(
+                s => s.userData && s.userData.currentFace === face
+            );
+            
+            faceStickers.forEach(s => {
+                cubeString += s.userData.color || face;
+            });
         });
 
-        return cubeString;
+        if (cubeString.length === 54) {
+            return cubeString;
+        }
     }
-
     return null;
 }
 
 /**
- * Solve Cube and trigger UI & Animation
+ * Solve Cube and return moves array
  */
 function solveCube() {
     initializeSolver();
@@ -68,91 +53,33 @@ function solveCube() {
     const cubeString = getCubeString();
 
     if (!cubeString || cubeString.length !== 54) {
-        console.error("Invalid cube string state");
-        if (typeof showToast === 'function') {
-            showToast("Complete all 54 stickers first!");
-        } else {
-            alert("க்யூப் தரவு தவறாக உள்ளது!");
-        }
+        console.error("Invalid cube string state or incomplete stickers");
         return [];
     }
 
     try {
-        if (typeof Cube === 'undefined') {
-            throw new Error("Cube library is not loaded properly.");
-        }
-
         const parsedCube = Cube.fromString(cubeString);
-
+        
         if (parsedCube.isSolved()) {
-            if (typeof showToast === 'function') showToast("Cube is already solved!");
             return [];
         }
 
         const solution = parsedCube.solve(22);
 
         if (!solution) {
-            console.error("Unable to solve cube");
-            if (typeof showToast === 'function') showToast("No solution found!");
+            console.error("Unable to solve cube layout");
             return [];
         }
 
         solutionMoves = solution.trim().split(/\s+/);
-        console.log("Solution found:", solutionMoves);
-
-        // State update & UI Transition
-        if (typeof solverState !== 'undefined') {
-            solverState.solutionMoves = solutionMoves;
-            solverState.totalMoves = solutionMoves.length;
-            solverState.currentMoveIndex = 0;
-            solverState.moveQueue = [];
-
-            // UI View Transition (Editor -> Solver)
-            const editorPage = document.getElementById("editor-page");
-            const solverPage = document.getElementById("solver-page");
-
-            if (editorPage && solverPage) {
-                editorPage.classList.add("hidden");
-                solverPage.classList.remove("hidden");
-            }
-
-            // Update UI Elements
-            const moveCounter = document.getElementById("move-counter");
-            const statsMoves = document.getElementById("stats-moves");
-            const algorithmList = document.getElementById("algorithm-list");
-
-            if (moveCounter) moveCounter.textContent = `Move 0 / ${solverState.totalMoves}`;
-            if (statsMoves) statsMoves.textContent = solverState.totalMoves;
-            if (algorithmList) algorithmList.textContent = solutionMoves.join(" ");
-
-            // Toast message
-            if (typeof showToast === 'function') {
-                showToast(`Solution found! Total moves: ${solverState.totalMoves}`);
-            }
-
-            // Prepare Animation Move Queue
-            for (let i = 0; i < solverState.totalMoves; i++) {
-                solverState.moveQueue.push("next");
-            }
-
-            if (typeof processMoveQueue === 'function') {
-                processMoveQueue();
-            }
-        }
 
         if (typeof loadSolution === 'function') {
             loadSolution(solutionMoves);
         }
 
         return solutionMoves;
-
     } catch (err) {
         console.error("Solver Execution Error:", err);
-        if (typeof showToast === 'function') {
-            showToast("Solver Error: " + err.message);
-        } else {
-            alert("க்யூப்பைத் தீர்ப்பதில் பிழை: " + err.message);
-        }
         return [];
     }
 }
@@ -174,7 +101,3 @@ function resetSolver() {
     }
 }
 
-// Global scope Access (Window Object Binding)
-window.solveCube = solveCube;
-window.getSolutionMoves = getSolutionMoves;
-window.resetSolver = resetSolver;
