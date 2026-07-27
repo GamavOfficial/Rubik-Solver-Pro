@@ -1,13 +1,9 @@
 import * as THREE from "three";
+//import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
-// Solver Initialization
-if (typeof Cube !== "undefined" && Cube.initSolver) {
-    Cube.initSolver();
-}
-
-
+Cube.initSolver();
 
 
 /* ==========================================
@@ -29,28 +25,24 @@ const finishPage = document.getElementById("finish-page");
 const toast = document.getElementById("toast");
 
 // ---------- App State ----------
+
 const appState = {
+
     currentFace: 0,
+
     totalFaces: 6,
+
     selectedColor: "white",
+
     filledStickers: 0,
+
     cubeValidated: false,
+
     cubeSolved: false,
+
     solving: false
+
 };
-
-// ---------- Solver State ----------
-const solverState = {
-    solutionMoves: [],
-    currentMoveIndex: 0,
-    totalMoves: 0,
-    isPlaying: false,
-    moveQueue: []
-};
-
-
-const moveCounterDisplay = document.getElementById("face-counter");
-
 
 // ---------- Utility ----------
 
@@ -350,27 +342,15 @@ document.getElementById("next-face");
    Face Counter
 ========================================== */
 
-function updateMoveUI() {
-    if (!moveCounterDisplay) return;
-    
-    if (appState.solving) {
-        // Solve Mode (e.g. 0 / 29)
-        moveCounterDisplay.textContent = `${solverState.currentMoveIndex} / ${solverState.totalMoves}`;
-    } else {
-        // Paint Mode (e.g. 1 / 6)
-        moveCounterDisplay.textContent = `${appState.currentFace + 1} / ${appState.totalFaces}`;
-    }
-    
-    const progressElem = document.getElementById("face-progress");
-    if (progressElem && !appState.solving) {
-        progressElem.value = appState.currentFace + 1;
-    }
-}
-
 function updateFaceCounter() {
-    updateMoveUI();
-}
 
+    document.getElementById("face-counter").textContent =
+        `${appState.currentFace + 1} / ${appState.totalFaces}`;
+
+    document.getElementById("face-progress").value =
+        appState.currentFace + 1;
+
+}
 
 /* ==========================================
    Filled Counter
@@ -462,22 +442,22 @@ function validateCube() {
 
     }
 
-        for (const face of Object.keys(counts)) {
+    for (const face of Object.keys(counts)) {
 
-        if (counts[face] !== 9) {
+    if (counts[face] !== 9) {
 
-            showToast(`Face ${face} must have exactly 9 stickers.`);
+        alert(face + " = " + counts[face]);
 
-            return false;
-
-        }
+        return false;
 
     }
 
-    console.log("Validation Counts:", counts);
+}
 
-    appState.cubeValidated = true;
+    console.log(counts);
+alert(JSON.stringify(counts));
 
+appState.cubeValidated = true;
 
 showToast("Cube validation successful.");
 
@@ -597,6 +577,8 @@ const camera = new THREE.PerspectiveCamera(
     1000
 );
 
+camera.position.set(4.5,4.5,4.5);
+
 const renderer = new THREE.WebGLRenderer({
     antialias: true,
     alpha: true
@@ -611,10 +593,8 @@ renderer.setSize(
 
 viewer.appendChild(renderer.domElement);
 
-// எடிட்டர் வியூவிற்கான சரியான கேமரா அமைப்பு
 camera.position.set(0, 0, 8);
 camera.lookAt(0, 0, 0);
-
 
 /* ==========================================
    Lights
@@ -743,6 +723,7 @@ scene.add(rubiksCube);
 
 rubiksCube.position.set(0, 0, 0);
 
+const cubeRotation = new CubeRotation(rubiksCube);
 
 const stickers = [];
 
@@ -769,14 +750,10 @@ renderer.domElement.addEventListener(
 
 function onPointerDown(event) {
 
-    // சால்வ் ஆகிக் கொண்டிருக்கும் போது எடிட் செய்வதைத் தடுக்கும் பாதுகாப்பு வரி
-    if (appState.solving) return;
-
     const rect = renderer.domElement.getBoundingClientRect();
 
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
 
     raycaster.setFromCamera(mouse, camera);
 
@@ -854,164 +831,115 @@ showToast(appState.selectedColor + " Applied");
 let firstFrame = true;
 
 function animate() {
-    requestAnimationFrame(animate);
 
-    if (typeof cubeRotation !== "undefined" && cubeRotation.update) {
-        cubeRotation.update();
+    if (firstFrame) {
+    
+        firstFrame = false;
     }
 
-    renderer.render(scene, camera);
-}
+    requestAnimationFrame(animate);
 
+    cubeRotation.update();
+
+    renderer.render(scene, camera);
+
+}
 
 
 animate();
 
+const faceRotations = [
+    null,
+    "right",
+    "up",
+    "right",
+    "right",
+    "up"
+];
 
-/* ==========================================
-   Cube Engine & Rotation Setup
-========================================== */
-const cubeRotation = new CubeRotation(rubiksCube);
-window.cubeEngine = cubeRotation; // Global connection
-
-/* ==========================================
-   Face Navigation Event Listeners
-========================================== */
-if (nextFaceBtn) {
-    nextFaceBtn.addEventListener("click", () => {
-        if (appState.solving) {
-            // Solve Mode: Move 1 Step Forward
-            if (solverState.currentMoveIndex < solverState.totalMoves) {
-                solverState.moveQueue.push("next");
-                processMoveQueue();
-            }
-        } else {
-            // Edit/Paint Mode: CubeRotation.next() அனிமேஷனை இயக்குகிறது
-            if (cubeRotation.isAnimating()) return;
-
-            const moved = cubeRotation.next();
-            if (moved) {
-                appState.currentFace++;
-                updateMoveUI();
-            } else {
-                showToast("All faces viewed!");
-            }
-        }
-    });
+function debugRotation(move) {
+    console.log(
+        "Face:",
+        appState.currentFace,
+        "Move:",
+        move,
+        "Quaternion:",
+        rubiksCube.quaternion.toArray()
+    );
 }
 
-if (previousFaceBtn) {
-    previousFaceBtn.addEventListener("click", () => {
-        if (appState.solving) {
-            // Solve Mode: Move 1 Step Backward
-            if (solverState.currentMoveIndex > 0) {
-                solverState.moveQueue.push("prev");
-                processMoveQueue();
-            }
-        } else {
-            // Edit/Paint Mode: CubeRotation.previous() மூலம் பழைய நிலைக்குச் செல்லும்
-            if (cubeRotation.isAnimating()) return;
-
-            const moved = cubeRotation.previous();
-            if (moved) {
-                appState.currentFace--;
-                updateMoveUI();
-            }
-        }
-    });
+function showCurrentFace() {
+    updateFaceCounter();
 }
 
+nextFaceBtn.addEventListener("click", () => {
 
+    if (cubeRotation.isAnimating()) return;
 
-/* ==========================================
-   Solve Logic & Step-by-Step Queue
-========================================== */
+    if (appState.currentFace >= 5) return;
 
-async function solveCube() {
+    appState.currentFace++;
+
+    const move = faceRotations[appState.currentFace];
+
+    if (move) {
+    debugRotation(move);
+    cubeRotation.rotate(move);
+}
+
+    showCurrentFace();
+
+});
+
+previousFaceBtn.addEventListener("click", () => {
+
+    if (cubeRotation.isAnimating()) return;
+
+    if (appState.currentFace <= 0) return;
+
+    const move = faceRotations[appState.currentFace];
+
+    if (move === "right") {
+        cubeRotation.rotate("left");
+    } else if (move === "up") {
+        cubeRotation.rotate("down");
+    }
+
+    appState.currentFace--;
+
+    showCurrentFace();
+
+});
+
+async function solveCube(cubeState) {
+    
+
     const cubeString = getCubeString();
+    
 
     try {
-        if (!cubeString || cubeString.length !== 54) {
-            showToast("Invalid Cube State!");
-            return;
-        }
 
         const cube = Cube.fromString(cubeString);
 
-        if (cube.isSolved()) {
-            showToast("Cube is already solved!");
-            return;
-        }
+alert(cube.isSolved());
 
-        const solution = cube.solve(22);
+alert("Before solve");
 
-        if (solution) {
-            solverState.solutionMoves = solution.trim().split(/\s+/);
-            solverState.totalMoves = solverState.solutionMoves.length;
-            solverState.currentMoveIndex = 0;
-            solverState.moveQueue = [];
+const solution = cube.solve();
 
-            appState.solving = true;
+alert("After solve");
 
-            // 3D Perspective View-க்கு மாற்றுதல்
-            if (window.cubeEngine && typeof window.cubeEngine.setPerspective3DView === "function") {
-                window.cubeEngine.setPerspective3DView();
-            }
-
-            updateMoveUI();
-            showToast(`Solution found! Total moves: ${solverState.totalMoves}`);
-        } else {
-            showToast("No solution found for this configuration.");
-        }
+alert(solution);
 
     } catch (e) {
-        alert("Solver Error: " + e.message);
+
+        alert(e.message);
+
         console.error(e);
-    }
-}
 
-/* Queue Runner - Fast clicking-ஐக் கையாள */
-async function processMoveQueue() {
-    if (solverState.isPlaying || solverState.moveQueue.length === 0) return;
-
-    solverState.isPlaying = true;
-    const direction = solverState.moveQueue.shift();
-
-    if (direction === "next" && solverState.currentMoveIndex < solverState.totalMoves) {
-        const move = solverState.solutionMoves[solverState.currentMoveIndex];
-        
-        if (window.cubeEngine && typeof window.cubeEngine.applyAlgorithm === "function") {
-            await window.cubeEngine.applyAlgorithm(move);
-        }
-        
-        solverState.currentMoveIndex++;
-        updateMoveUI();
-
-    } else if (direction === "prev" && solverState.currentMoveIndex > 0) {
-        solverState.currentMoveIndex--;
-        const move = solverState.solutionMoves[solverState.currentMoveIndex];
-        const inverseMove = getInverseMove(move);
-        
-        if (window.cubeEngine && typeof window.cubeEngine.applyAlgorithm === "function") {
-            await window.cubeEngine.applyAlgorithm(inverseMove);
-        }
-        
-        updateMoveUI();
     }
 
-    solverState.isPlaying = false;
-
-    if (solverState.moveQueue.length > 0) {
-        processMoveQueue();
-    }
 }
-
-function getInverseMove(move) {
-    if (move.endsWith("'")) return move.slice(0, -1);
-    if (move.endsWith("2")) return move;
-    return move + "'";
-}
-
 
 function getCubeString() {
 
@@ -1050,3 +978,4 @@ window.addEventListener(
 
     }
 );
+
