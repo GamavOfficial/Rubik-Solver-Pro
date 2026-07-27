@@ -2,6 +2,7 @@ import * as THREE from "three";
 //import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
+import CubeAnimation, { ANIMATION_TYPES } from "./animation.js";
 
 
 
@@ -42,6 +43,11 @@ const appState = {
     solving: false
 
 };
+
+// ---------- Animation & Playback State ----------
+let cubeAnimation = null;
+let solverMoves = [];
+let currentMoveIndex = 0;
 
 // ---------- Utility ----------
 
@@ -494,7 +500,6 @@ solveBtn.addEventListener("click", async () => {
     showToast("Calculating Solution... Please wait");
     solveBtn.disabled = true;
 
-    // UI பிரவுசர் ஹேங் ஆகாமல் இருக்க சிறிது இடைவெளி தருகிறது
     await sleep(50);
 
     setTimeout(() => {
@@ -649,28 +654,6 @@ directionalLight.position.set(5, 10, 7);
 scene.add(directionalLight);
 
 /* ==========================================
-   Orbit Controls
-========================================== */
-/*
-const controls = new OrbitControls(
-    camera,
-    renderer.domElement
-);
-
-controls.target.set(0, 0, 0);
-controls.update();
-
-controls.enableDamping = false;
-
-controls.enableRotate = false;
-controls.enableZoom = false;
-controls.enablePan = false;
-
-camera.position.set(0,0,8);
-camera.lookAt(0,0,0);*/
-
-
-/* ==========================================
    Rubik's Cube (27 Cubies)
 ========================================== */
 
@@ -693,15 +676,13 @@ for (let x = -1; x <= 1; x++) {
         for (let z = -1; z <= 1; z++) {
 
             const materials = [
-
-    new THREE.MeshStandardMaterial({ color: 0x222222 }),
-    new THREE.MeshStandardMaterial({ color: 0x222222 }),
-    new THREE.MeshStandardMaterial({ color: 0x222222 }),
-    new THREE.MeshStandardMaterial({ color: 0x222222 }),
-    new THREE.MeshStandardMaterial({ color: 0x222222 }),
-    new THREE.MeshStandardMaterial({ color: 0x222222 })
-
-];
+                new THREE.MeshStandardMaterial({ color: 0x222222 }),
+                new THREE.MeshStandardMaterial({ color: 0x222222 }),
+                new THREE.MeshStandardMaterial({ color: 0x222222 }),
+                new THREE.MeshStandardMaterial({ color: 0x222222 }),
+                new THREE.MeshStandardMaterial({ color: 0x222222 }),
+                new THREE.MeshStandardMaterial({ color: 0x222222 })
+            ];
 
             const cubie = new THREE.Mesh(
                 new THREE.BoxGeometry(
@@ -713,60 +694,43 @@ for (let x = -1; x <= 1; x++) {
             );
 
             cubie.position.set(
-    x * (cubieSize + gap),
-    y * (cubieSize + gap),
-    z * (cubieSize + gap)
-);
+                x * (cubieSize + gap),
+                y * (cubieSize + gap),
+                z * (cubieSize + gap)
+            );
 
-const isCenterCubie =
-    x === 0 &&
-    y === 0 &&
-    z === 0;
-    
-    if (isCenterCubie) {
-    console.log("Center Cubie Created");
-}
+            cubie.userData = {
+                x,
+                y,
+                z,
+                painted: [null, null, null, null, null, null],
+                original: [null, null, null, null, null, null]
+            };
 
-cubie.userData = {
-    x,
-    y,
-    z,
-
-    painted: [null, null, null, null, null, null],
-    original: [null, null, null, null, null, null],
-
-    stickers: [
-        { face: "R", index: -1 },
-        { face: "L", index: -1 },
-        { face: "U", index: -1 },
-        { face: "D", index: -1 },
-        { face: "F", index: -1 },
-        { face: "B", index: -1 }
-    ]
-};
-
-rubiksCube.add(cubie);
-
+            rubiksCube.add(cubie);
         }
     }
 }
 
 scene.add(rubiksCube);
-
 rubiksCube.position.set(0, 0, 0);
 
 const cubeRotation = new CubeRotation(rubiksCube);
 
-const stickers = [];
+// Initialize Mock Engine bridge for Animation compatibility
+const mockEngine = {
+    isAnimating: false,
+    turnSpeed: 400,
+    speed: { slow: 600, normal: 400, fast: 200 },
+    navigateToFace: (faceCode) => {
+        // Handle visual face navigation mapping if needed
+    },
+    enqueue: (move) => {
+        // Bridge individual move logic here if required
+    }
+};
 
-const stickerSize = 0.82;
-
-/* ==========================================
-   Cube Orientation
-========================================== */
-
-
-
+cubeAnimation = new CubeAnimation(mockEngine);
 
 /* ==========================================
    Raycaster
@@ -796,64 +760,56 @@ function onPointerDown(event) {
     const hit = intersects[0];
     const cubie = hit.object;
 
-    // எந்த face-ஐ click செய்தோம்?
-const faceIndex = Math.floor(hit.faceIndex / 2);
+    const faceIndex = Math.floor(hit.faceIndex / 2);
+    const previousColor = cubie.userData.painted[faceIndex];
+    const faceLetter = ["R","L","U","D","F","B"][faceIndex];
 
-const previousColor = cubie.userData.painted[faceIndex];
+    const x = cubie.userData.x;
+    const y = cubie.userData.y;
+    const z = cubie.userData.z;
 
-const faceLetter = ["R","L","U","D","F","B"][faceIndex];
+    if (
+        (faceLetter === "R" && x !== 1) ||
+        (faceLetter === "L" && x !== -1) ||
+        (faceLetter === "U" && y !== 1) ||
+        (faceLetter === "D" && y !== -1) ||
+        (faceLetter === "F" && z !== 1) ||
+        (faceLetter === "B" && z !== -1)
+    ) {
+        return;
+    }
 
-const x = cubie.userData.x;
-const y = cubie.userData.y;
-const z = cubie.userData.z;
+    if (
+        previousColor !== appState.selectedColor &&
+        colorUsage[appState.selectedColor] >= 9
+    ) {
+        showToast(appState.selectedColor + " limit reached (9/9)");
+        return;
+    }
 
-if (
-    (faceLetter === "R" && x !== 1) ||
-    (faceLetter === "L" && x !== -1) ||
-    (faceLetter === "U" && y !== 1) ||
-    (faceLetter === "D" && y !== -1) ||
-    (faceLetter === "F" && z !== 1) ||
-    (faceLetter === "B" && z !== -1)
-) {
-    return;
-}
+    if (previousColor === appState.selectedColor) {
+        return;
+    }
 
-if (
-    previousColor !== appState.selectedColor &&
-    colorUsage[appState.selectedColor] >= 9
-) {
-    showToast(appState.selectedColor + " limit reached (9/9)");
-    return;
-}
+    if (previousColor) {
+        colorUsage[previousColor]--;
+    }
 
-if (previousColor === appState.selectedColor) {
-    return;
-}
+    cubie.userData.painted[faceIndex] = appState.selectedColor;
+    colorUsage[appState.selectedColor]++;
 
-if (previousColor) {
-    colorUsage[previousColor]--;
-}
+    cubie.material[faceIndex].color.setHex(
+        colorMap[appState.selectedColor]
+    );
 
-cubie.userData.painted[faceIndex] = appState.selectedColor;
-
-colorUsage[appState.selectedColor]++;
-
-cubie.material[faceIndex].color.setHex(
-    colorMap[appState.selectedColor]
-);
-
-const stickerIndex = getStickerIndex(cubie, faceLetter);
-
-cubeState[faceLetter][stickerIndex] =
-    COLOR_TO_FACE[appState.selectedColor];
+    const stickerIndex = getStickerIndex(cubie, faceLetter);
+    cubeState[faceLetter][stickerIndex] = COLOR_TO_FACE[appState.selectedColor];
     
+    updateFilledCounter();
+    updateValidateButton();
+    updateColorCounters();
 
-updateFilledCounter();
-updateValidateButton();
-updateColorCounters();
-
-showToast(appState.selectedColor + " Applied");
-
+    showToast(appState.selectedColor + " Applied");
 }
 
 /* ==========================================
@@ -863,20 +819,19 @@ showToast(appState.selectedColor + " Applied");
 let firstFrame = true;
 
 function animate() {
-
     if (firstFrame) {
-    
         firstFrame = false;
     }
 
     requestAnimationFrame(animate);
 
     cubeRotation.update();
+    if (cubeAnimation) {
+        cubeAnimation.update(0.016);
+    }
 
     renderer.render(scene, camera);
-
 }
-
 
 animate();
 
@@ -889,44 +844,25 @@ const faceRotations = [
     "up"
 ];
 
-function debugRotation(move) {
-    console.log(
-        "Face:",
-        appState.currentFace,
-        "Move:",
-        move,
-        "Quaternion:",
-        rubiksCube.quaternion.toArray()
-    );
-}
-
 function showCurrentFace() {
     updateFaceCounter();
 }
 
 nextFaceBtn.addEventListener("click", () => {
-
     if (cubeRotation.isAnimating()) return;
-
     if (appState.currentFace >= 5) return;
 
     appState.currentFace++;
-
     const move = faceRotations[appState.currentFace];
 
     if (move) {
-    debugRotation(move);
-    cubeRotation.rotate(move);
-}
-
+        cubeRotation.rotate(move);
+    }
     showCurrentFace();
-
 });
 
 previousFaceBtn.addEventListener("click", () => {
-
     if (cubeRotation.isAnimating()) return;
-
     if (appState.currentFace <= 0) return;
 
     const move = faceRotations[appState.currentFace];
@@ -938,9 +874,7 @@ previousFaceBtn.addEventListener("click", () => {
     }
 
     appState.currentFace--;
-
     showCurrentFace();
-
 });
 
 /* ==========================================
@@ -950,18 +884,9 @@ previousFaceBtn.addEventListener("click", () => {
 window.addEventListener(
     "resize",
     () => {
-
-        camera.aspect =
-            viewer.clientWidth /
-            viewer.clientHeight;
-
+        camera.aspect = viewer.clientWidth / viewer.clientHeight;
         camera.updateProjectionMatrix();
-
-        renderer.setSize(
-            viewer.clientWidth,
-            viewer.clientHeight
-        );
-
+        renderer.setSize(viewer.clientWidth, viewer.clientHeight);
     }
 );
 
@@ -988,7 +913,6 @@ window.loadSolution = function(moves) {
         return;
     }
 
-    // நேரடியாக style.display மாற்றுவதன் மூலம் பேஜ் மறைந்து அனிமேஷன் பேஜ் வருவது உறுதியாகும்
     if (editorPage && solverPage) {
         editorPage.style.display = "none";
         solverPage.style.display = "block";
@@ -996,17 +920,62 @@ window.loadSolution = function(moves) {
         solverPage.classList.remove("hidden");
     }
 
+    solverMoves = moves;
+    currentMoveIndex = 0;
+
     const moveCounter = document.getElementById("move-counter");
     const statsMoves = document.getElementById("stats-moves");
     const algorithmList = document.getElementById("algorithm-list");
+    const currentMoveEl = document.getElementById("current-move");
 
-    if (moveCounter) moveCounter.textContent = `Move 0 / ${moves.length}`;
+    if (moveCounter) moveCounter.textContent = `Move 1 / ${moves.length}`;
     if (statsMoves) statsMoves.textContent = moves.length;
     if (algorithmList) algorithmList.textContent = moves.join(" ");
+    if (currentMoveEl) currentMoveEl.textContent = moves[0] || "-";
 
     showToast(`Solution found! ${moves.length} moves.`);
 
-    if (cubeRotation && typeof cubeRotation.setPerspective3DView === "function") {
-        cubeRotation.setPerspective3DView();
+    // Hook up Player UI Controls on Solver Page
+    const playerPlay = document.getElementById("player-play");
+    const playerPause = document.getElementById("player-pause");
+    const playerNext = document.getElementById("player-next");
+    const speedSelect = document.getElementById("speed-select");
+    const solveAgainBtn = document.getElementById("solve-again");
+
+    if (playerPlay && cubeAnimation) {
+        playerPlay.onclick = () => {
+            const speedMode = speedSelect ? speedSelect.value : "normal";
+            cubeAnimation.play(
+                solverMoves.slice(currentMoveIndex).join(" "),
+                speedMode,
+                (move) => {
+                    currentMoveIndex = Math.min(currentMoveIndex + 1, solverMoves.length);
+                    if (currentMoveEl) currentMoveEl.textContent = solverMoves[currentMoveIndex] || "Done";
+                    if (moveCounter) moveCounter.textContent = `Move ${currentMoveIndex + 1} / ${solverMoves.length}`;
+                },
+                () => {
+                    showToast("Cube Solved Successfully! 🎉");
+                    if (solverPage && finishPage) {
+                        solverPage.style.display = "none";
+                        finishPage.style.display = "block";
+                        solverPage.classList.add("hidden");
+                        finishPage.classList.remove("hidden");
+                        document.getElementById("finish-moves").textContent = solverMoves.length;
+                    }
+                }
+            );
+        };
+    }
+
+    if (playerPause && cubeAnimation) {
+        playerPause.onclick = () => cubeAnimation.pause();
+    }
+
+    if (playerNext && cubeAnimation) {
+        playerNext.onclick = () => cubeAnimation.skipCurrentMove();
+    }
+
+    if (solveAgainBtn) {
+        solveAgainBtn.onclick = () => window.location.reload();
     }
 };
