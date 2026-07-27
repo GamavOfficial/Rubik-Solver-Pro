@@ -44,6 +44,16 @@ const appState = {
 
 };
 
+// ---------- Solver State (Animation-க்கு தேவை) ----------
+const solverState = {
+    solutionMoves: [],
+    currentMoveIndex: 0,
+    totalMoves: 0,
+    isPlaying: false,
+    moveQueue: []
+};
+
+
 // ---------- Utility ----------
 
 function sleep(ms) {
@@ -454,10 +464,10 @@ function validateCube() {
 
 }
 
-    console.log(counts);
-alert(JSON.stringify(counts));
+        console.log("Sticker counts:", counts);
 
-appState.cubeValidated = true;
+    appState.cubeValidated = true;
+
 
 showToast("Cube validation successful.");
 
@@ -911,35 +921,85 @@ previousFaceBtn.addEventListener("click", () => {
 
 });
 
-async function solveCube(cubeState) {
-    
-
+async function solveCube() {
     const cubeString = getCubeString();
-    
 
     try {
+        if (!cubeString || cubeString.length !== 54) {
+            showToast("Invalid Cube State!");
+            return;
+        }
 
         const cube = Cube.fromString(cubeString);
 
-alert(cube.isSolved());
+        if (cube.isSolved()) {
+            showToast("Cube is already solved!");
+            return;
+        }
 
-alert("Before solve");
+        // Kociemba solver மூலம் தீர்வைக் கணக்கிடுகிறோம்
+        const solution = cube.solve();
 
-const solution = cube.solve();
+        if (solution) {
+            solverState.solutionMoves = solution.trim().split(/\s+/);
+            solverState.totalMoves = solverState.solutionMoves.length;
+            solverState.currentMoveIndex = 0;
+            solverState.moveQueue = [];
 
-alert("After solve");
+            appState.solving = true;
 
-alert(solution);
+            // 3D Perspective View-க்கு மாற்றுகிறோம்
+            if (cubeRotation && typeof cubeRotation.setPerspective3DView === "function") {
+                cubeRotation.setPerspective3DView();
+            }
+
+            showToast(`Solution found! Total moves: ${solverState.totalMoves}`);
+
+            // அனிமேஷன் தானாகவே வரிசையாக நடக்க Move Queue-வை இயக்குகிறோம்
+            for (let i = 0; i < solverState.totalMoves; i++) {
+                solverState.moveQueue.push("next");
+            }
+            processMoveQueue();
+        } else {
+            showToast("No solution found!");
+        }
 
     } catch (e) {
-
-        alert(e.message);
-
+        showToast("Solver Error: " + e.message);
         console.error(e);
+    }
+}
 
+// அனிமேஷனை ஒன்றன்ப பின் ஒன்றாக வரிசையாக இயக்கும் ஃபங்க்ஷன்
+async function processMoveQueue() {
+    if (solverState.isPlaying || solverState.moveQueue.length === 0) return;
+
+    solverState.isPlaying = true;
+    const direction = solverState.moveQueue.shift();
+
+    if (direction === "next" && solverState.currentMoveIndex < solverState.totalMoves) {
+        const move = solverState.solutionMoves[solverState.currentMoveIndex];
+        
+        if (cubeRotation && typeof cubeRotation.applyAlgorithm === "function") {
+            await cubeRotation.applyAlgorithm(move);
+        }
+        
+        solverState.currentMoveIndex++;
+        
+        // UI Counter Update
+        const counterElem = document.getElementById("face-counter");
+        if (counterElem) {
+            counterElem.textContent = `${solverState.currentMoveIndex} / ${solverState.totalMoves}`;
+        }
     }
 
+    solverState.isPlaying = false;
+
+    if (solverState.moveQueue.length > 0) {
+        processMoveQueue();
+    }
 }
+
 
 function getCubeString() {
 
@@ -978,4 +1038,3 @@ window.addEventListener(
 
     }
 );
-
