@@ -506,6 +506,52 @@ solveBtn.addEventListener("click", () => {
 
 });
 
+// solveCube பங்க்ஷனையும் பிரவுசர் ஃப்ரீஸ் ஆகாதவாறு இதைச் சேர்த்துக்கொள்ளவும்
+async function solveCube(cubeState) {
+    const cubeString = getCubeString();
+    try {
+        if (typeof Cube === "undefined") {
+            showToast("Cube library not loaded.");
+            return;
+        }
+
+        const cube = Cube.fromString(cubeString);
+        if (cube.isSolved()) {
+            showToast("Cube is already solved!");
+            return;
+        }
+
+        // பிரவுசர் ஃப்ரீஸ் ஆகாமல் இருக்க சிறிய தாமதம்
+        await sleep(50);
+
+        const solution = cube.solve();
+        console.log("Solution Moves:", solution);
+        
+        // சால்வ் ஆன மூவ்களை ஸ்பேஸ் வைத்து பிரித்து அனிமேஷன் கியூவில் இயக்குவது
+        const movesArray = solution.trim().split(/\s+/);
+        if (movesArray.length > 0 && movesArray[0] !== "") {
+            showToast(`Solved in ${movesArray.length} moves! Playing animation...`);
+            
+            // சால்வ் ஆன மொத்த மூவ்ஸ் எண்ணிக்கையை UI-ல் காட்ட (உதாரணமாக: 1 / 33 போன்ற இடங்களில்)
+            const totalMovesElement = document.getElementById("total-moves"); // உங்கள் HTML-க்கு ஏற்ப இருந்தால் வேலை செய்யும்
+            if(totalMovesElement) totalMovesElement.textContent = movesArray.length;
+
+            playSolutionQueue(movesArray);
+        }
+
+    } catch (e) {
+        showToast("Error solving cube. Check colors.");
+        console.error(e);
+        
+        // எரர் வந்தால் எடிட்டர் பக்கத்திற்கே திரும்ப வர
+        if (typeof editorPage !== "undefined" && typeof solverPage !== "undefined") {
+            solverPage.classList.add("hidden");
+            editorPage.classList.remove("hidden");
+        }
+    }
+}
+
+
 
 /* ==========================================
    Refresh UI
@@ -1013,3 +1059,4 @@ function playSolutionQueue(moves) {
 
     executeNextMove();
 }
+
