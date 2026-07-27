@@ -3,7 +3,7 @@ import * as THREE from "three";
 import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
-Cube.initSolver();
+//Cube.initSolver();
 
 
 /* ==========================================
