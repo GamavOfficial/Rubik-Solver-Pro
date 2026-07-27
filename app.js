@@ -979,6 +979,7 @@ window.addEventListener(
     }
 );
 
+
 /* ==========================================
    Global Window Methods for Solver & Animation
 ========================================== */
@@ -992,14 +993,15 @@ window.getCubeString = function() {
     return result;
 };
 
-
-// ---------- [NEW REPLACE] Solution Animation Trigger & Player Controls ----------
+// ---------- Safe Solution Handler (No Freezing) ----------
 window.loadSolution = function(moves) {
     if (!moves || moves.length === 0) {
         showToast("No solution found!");
+        solveBtn.disabled = false;
         return;
     }
 
+    // 1. Editor பேஜை மறைத்துவிட்டு Solver பேஜுக்கு மாற்றுவது
     if (editorPage && solverPage) {
         editorPage.style.display = "none";
         solverPage.style.display = "block";
@@ -1007,9 +1009,7 @@ window.loadSolution = function(moves) {
         solverPage.classList.remove("hidden");
     }
 
-    solverMoves = moves;
-    currentMoveIndex = 0;
-
+    // 2. UI-ல் மூவ்களைக் காட்டுவது
     const moveCounter = document.getElementById("move-counter");
     const statsMoves = document.getElementById("stats-moves");
     const algorithmList = document.getElementById("algorithm-list");
@@ -1022,46 +1022,8 @@ window.loadSolution = function(moves) {
 
     showToast(`Solution found! ${moves.length} moves.`);
 
-    // Hook up Player UI Controls on Solver Page
-    const playerPlay = document.getElementById("player-play");
-    const playerPause = document.getElementById("player-pause");
-    const playerNext = document.getElementById("player-next");
-    const speedSelect = document.getElementById("speed-select");
+    // 3. Solve Again பட்டன் வேலை செய்ய வைப்பது
     const solveAgainBtn = document.getElementById("solve-again");
-
-    if (playerPlay && cubeAnimation) {
-        playerPlay.onclick = () => {
-            const speedMode = speedSelect ? speedSelect.value : "normal";
-            cubeAnimation.play(
-                solverMoves.slice(currentMoveIndex).join(" "),
-                speedMode,
-                (move) => {
-                    currentMoveIndex = Math.min(currentMoveIndex + 1, solverMoves.length);
-                    if (currentMoveEl) currentMoveEl.textContent = solverMoves[currentMoveIndex] || "Done";
-                    if (moveCounter) moveCounter.textContent = `Move ${currentMoveIndex + 1} / ${solverMoves.length}`;
-                },
-                () => {
-                    showToast("Cube Solved Successfully! 🎉");
-                    if (solverPage && finishPage) {
-                        solverPage.style.display = "none";
-                        finishPage.style.display = "block";
-                        solverPage.classList.add("hidden");
-                        finishPage.classList.remove("hidden");
-                        document.getElementById("finish-moves").textContent = solverMoves.length;
-                    }
-                }
-            );
-        };
-    }
-
-    if (playerPause && cubeAnimation) {
-        playerPause.onclick = () => cubeAnimation.pause();
-    }
-
-    if (playerNext && cubeAnimation) {
-        playerNext.onclick = () => cubeAnimation.skipCurrentMove();
-    }
-
     if (solveAgainBtn) {
         solveAgainBtn.onclick = () => window.location.reload();
     }
