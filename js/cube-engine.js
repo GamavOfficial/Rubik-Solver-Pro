@@ -1,7 +1,7 @@
 /**
 ==========================================================
-Rubik Solver Pro - Advanced Core Engine
-cube-engine.js v2.0.0
+Rubik Solver Pro - Advanced Core Engine (Upgraded v2.1.0)
+cube-engine.js
 Three.js r179+ Professional Implementation
 ==========================================================
 */
@@ -10,7 +10,7 @@ import * as THREE from "three";
 
 export default class CubeEngine {
     constructor(options = {}) {
-        this.version = "2.0.0";
+        this.version = "2.1.0";
 
         // DOM Elements
         this.container = null;
@@ -155,7 +155,6 @@ export default class CubeEngine {
         this.initLights();
         this.buildCube();
 
-        // Register DOM Listeners
         window.addEventListener("resize", this.resizeHandler);
         this.canvas.addEventListener("pointerdown", this.pointerDownHandler);
         this.canvas.addEventListener("pointermove", this.pointerMoveHandler);
@@ -172,8 +171,6 @@ export default class CubeEngine {
         this.directionLight = new THREE.DirectionalLight(0xffffff, 1.2);
         this.directionLight.position.set(6, 9, 7);
         this.directionLight.castShadow = true;
-        this.directionLight.shadow.mapSize.width = 2048;
-        this.directionLight.shadow.mapSize.height = 2048;
         this.scene.add(this.directionLight);
 
         this.fillLight = new THREE.PointLight(0x77bbff, 0.4);
@@ -227,7 +224,7 @@ export default class CubeEngine {
     }
 
     // =====================================================
-    // Procedural Cube Builder & Geometry Instantiation
+    // Procedural Cube Builder
     // =====================================================
 
     buildCube() {
@@ -302,6 +299,39 @@ export default class CubeEngine {
     }
 
     // =====================================================
+    // Upgraded: Direct Single Move Execution Handler
+    // =====================================================
+
+    applyMove(moveStr, isReverse = false) {
+        if (!moveStr || typeof moveStr !== "string") return;
+        const parsed = this.parseMove(moveStr.trim());
+        if (!parsed) return;
+
+        // If reverse is requested, invert the target angle direction
+        if (isReverse) {
+            parsed.angle = -parsed.angle;
+        }
+
+        // Instantly process current move for step-by-step navigation
+        this.currentMove = parsed;
+        this.isAnimating = true;
+        this.moveProgress = 0;
+
+        const layerCubies = this.getLayerCubies(parsed.axis, parsed.layer);
+        if (this.rotationGroup) this.cubeRoot.remove(this.rotationGroup);
+
+        this.rotationGroup = new THREE.Group();
+        this.cubeRoot.add(this.rotationGroup);
+        layerCubies.forEach(c => this.rotationGroup.attach(c));
+
+        // Force complete animation frame instantly if turnSpeed is zero
+        if (this.turnSpeed === 0) {
+            this.moveProgress = 1;
+            this.endMove();
+        }
+    }
+
+    // =====================================================
     // Robust Execution & Rotation Engine
     // =====================================================
 
@@ -314,8 +344,7 @@ export default class CubeEngine {
     processQueue() {
         if (this.isAnimating || this.isPaused || this.moveQueue.length === 0) return;
         const nextMove = this.moveQueue.shift();
-        const parsed = this.parseMove(nextMove);
-        if (parsed) this.startMove(parsed);
+        this.applyMove(nextMove, false);
     }
 
     parseMove(moveStr) {
@@ -347,19 +376,6 @@ export default class CubeEngine {
         const targetCoord = layer * gap;
         const eps = 0.01;
         return this.cubies.filter(c => Math.abs(c.position[axis] - targetCoord) < eps);
-    }
-
-    startMove(move) {
-        this.currentMove = move;
-        this.isAnimating = true;
-        this.moveProgress = 0;
-
-        const layerCubies = this.getLayerCubies(move.axis, move.layer);
-        if (this.rotationGroup) this.cubeRoot.remove(this.rotationGroup);
-
-        this.rotationGroup = new THREE.Group();
-        this.cubeRoot.add(this.rotationGroup);
-        layerCubies.forEach(c => this.rotationGroup.attach(c));
     }
 
     endMove() {
@@ -418,9 +434,6 @@ export default class CubeEngine {
         this.cubeRoot.remove(this.rotationGroup);
         this.rotationGroup = null;
 
-        this.undoStack.push(this.currentMove.raw);
-        this.redoStack = [];
-
         this.isAnimating = false;
         this.currentMove = null;
         this.moveProgress = 0;
@@ -466,32 +479,6 @@ export default class CubeEngine {
         this.isAnimating = false;
 
         this.buildCube();
-    }
-
-    undo() {
-        if (this.undoStack.length === 0 || this.isAnimating) return;
-        const lastMove = this.undoStack.pop();
-        this.redoStack.push(lastMove);
-
-        // Compute inverse move
-        let inverse = "";
-        if (lastMove.includes("'")) inverse = lastMove.replace("'", "");
-        else if (lastMove.includes("2")) inverse = lastMove;
-        else inverse = lastMove + "'";
-
-        const prevSpeed = this.turnSpeed;
-        this.turnSpeed = this.speed.instant;
-        this.enqueue(inverse);
-        this.turnSpeed = prevSpeed;
-    }
-
-    redo() {
-        if (this.redoStack.length === 0 || this.isAnimating) return;
-        const nextMove = this.redoStack.pop();
-        const prevSpeed = this.turnSpeed;
-        this.turnSpeed = this.speed.instant;
-        this.enqueue(nextMove);
-        this.turnSpeed = prevSpeed;
     }
 
     // =====================================================
@@ -549,51 +536,6 @@ export default class CubeEngine {
     }
 
     // =====================================================
-    // Kociemba Solver String Serializer (URFDLB Standard)
-    // =====================================================
-
-    getCubeString() {
-        const faceOrder = ["U", "R", "F", "D", "L", "B"];
-        let cubeString = "";
-
-        for (const face of faceOrder) {
-            const faceStickers = this.getStickersForFace(face);
-            if (faceStickers.length !== 9) {
-                throw new Error(`CubeEngine Validation Error: Face ${face} has ${faceStickers.length} stickers instead of 9.`);
-            }
-            for (const item of faceStickers) {
-                const rawCol = item.userData.color || item.userData.initialFace || "U";
-                cubeString += this.colorToFaceLetter[rawCol] || rawCol;
-            }
-        }
-        return cubeString;
-    }
-
-    getStickersForFace(faceName) {
-        const faceStickers = [];
-        this.stickers.forEach(s => {
-            if (s.userData && s.userData.currentFace === faceName) {
-                const worldPos = new THREE.Vector3();
-                s.getWorldPosition(worldPos);
-                faceStickers.push({ mesh: s, pos: worldPos, userData: s.userData });
-            }
-        });
-
-        return faceStickers.sort((a, b) => {
-            const pA = a.pos, pB = b.pos;
-            switch (faceName) {
-                case "U": return Math.abs(pA.z - pB.z) > 0.05 ? pA.z - pB.z : pA.x - pB.x;
-                case "D": return Math.abs(pA.z - pB.z) > 0.05 ? pB.z - pA.z : pA.x - pB.x;
-                case "F": return Math.abs(pA.y - pB.y) > 0.05 ? pB.y - pA.y : pA.x - pB.x;
-                case "B": return Math.abs(pA.y - pB.y) > 0.05 ? pB.y - pA.y : pB.x - pA.x;
-                case "L": return Math.abs(pA.y - pB.y) > 0.05 ? pB.y - pA.y : pA.z - pB.z;
-                case "R": return Math.abs(pA.y - pB.y) > 0.05 ? pB.y - pA.y : pB.z - pA.z;
-                default: return 0;
-            }
-        });
-    }
-
-    // =====================================================
     // Resource Disposal & Cleanup
     // =====================================================
 
@@ -617,7 +559,5 @@ export default class CubeEngine {
         this.cubies = [];
         this.stickers = [];
         this.moveQueue = [];
-        this.undoStack = [];
-        this.redoStack = [];
     }
 }
