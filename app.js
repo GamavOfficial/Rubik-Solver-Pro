@@ -2,8 +2,6 @@ import * as THREE from "three";
 //import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
-// [NEW ADD] Import CubeAnimation for playback solution moves
-import CubeAnimation, { ANIMATION_TYPES } from "./animation.js";
 
 
 
