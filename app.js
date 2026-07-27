@@ -3,8 +3,13 @@ import * as THREE from "three";
 import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
-Cube.initSolver();
-
+if (typeof Cube !== 'undefined' && Cube.initSolver) {
+    try {
+        Cube.initSolver();
+    } catch (e) {
+        console.warn("Cube Solver init issue:", e);
+    }
+}
 
 /* ==========================================
    Rubik Solver Pro
@@ -27,21 +32,13 @@ const toast = document.getElementById("toast");
 // ---------- App State ----------
 
 const appState = {
-
     currentFace: 0,
-
     totalFaces: 6,
-
     selectedColor: "white",
-
     filledStickers: 0,
-
     cubeValidated: false,
-
     cubeSolved: false,
-
     solving: false
-
 };
 
 // ---------- Utility ----------
@@ -53,181 +50,93 @@ function sleep(ms) {
 // ---------- Toast ----------
 
 function showToast(message) {
-
     toast.textContent = message;
-
     toast.classList.add("show");
-
     setTimeout(() => {
-
         toast.classList.remove("show");
-
     }, 2500);
-
 }
 
 // ---------- Splash Loading ----------
 
 async function startSplash() {
-
     let progress = 0;
-
     while (progress <= 100) {
-
         loadingProgress.style.width = progress + "%";
-
         await sleep(25);
-
         progress++;
-
     }
 
-splashScreen.classList.add("hidden");
+    splashScreen.classList.add("hidden");
+    mainApp.classList.remove("hidden");
 
-mainApp.classList.remove("hidden");
+    setTimeout(() => {
+        camera.aspect = viewer.clientWidth / viewer.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+        renderer.render(scene, camera);
+    }, 100);
 
-setTimeout(() => {
-
-    camera.aspect =
-        viewer.clientWidth /
-        viewer.clientHeight;
-
-    camera.updateProjectionMatrix();
-
-    renderer.setSize(
-        viewer.clientWidth,
-        viewer.clientHeight
-    );
-
-    renderer.render(scene, camera);
-
-}, 100);
-
-showToast("Welcome to Rubik Solver Pro");
-
+    showToast("Welcome to Rubik Solver Pro");
 }
 
-// ---------- Start App ----------
-
 window.addEventListener("load", () => {
-
     startSplash();
-
 });
+
 /* ==========================================
    Theme System
 ========================================== */
 
 const themeBtn = document.getElementById("theme-btn");
-
 let currentTheme = localStorage.getItem("theme") || "dark";
-
 applyTheme(currentTheme);
 
 themeBtn.addEventListener("click", () => {
-
-    currentTheme =
-        currentTheme === "dark"
-            ? "light"
-            : "dark";
-
+    currentTheme = currentTheme === "dark" ? "light" : "dark";
     applyTheme(currentTheme);
-
 });
 
 function applyTheme(theme) {
-
-    document.body.setAttribute(
-        "data-theme",
-        theme
-    );
-
-    localStorage.setItem(
-        "theme",
-        theme
-    );
-
-    themeBtn.textContent =
-        theme === "dark"
-            ? "🌙"
-            : "☀️";
-
+    document.body.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+    themeBtn.textContent = theme === "dark" ? "🌙" : "☀️";
 }
 
 /* ==========================================
-   Settings Button
+   Settings & PWA
 ========================================== */
 
-const settingsBtn =
-document.getElementById("settings-btn");
-
+const settingsBtn = document.getElementById("settings-btn");
 settingsBtn.addEventListener("click", () => {
-
-    showToast(
-        "Settings coming soon..."
-    );
-
+    showToast("Settings coming soon...");
 });
 
-/* ==========================================
-   Install PWA
-========================================== */
-
-const installBtn =
-document.getElementById("install-btn");
-
+const installBtn = document.getElementById("install-btn");
 let deferredPrompt = null;
 
-window.addEventListener(
-    "beforeinstallprompt",
-    (event) => {
+window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    deferredPrompt = event;
+    installBtn.style.display = "inline-flex";
+});
 
-        event.preventDefault();
-
-        deferredPrompt = event;
-
-        installBtn.style.display = "inline-flex";
-
+installBtn.addEventListener("click", async () => {
+    if (!deferredPrompt) {
+        showToast("Install not available.");
+        return;
     }
-);
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installBtn.style.display = "none";
+});
 
-installBtn.addEventListener(
-    "click",
-    async () => {
+window.addEventListener("appinstalled", () => {
+    showToast("Rubik Solver installed!");
+    installBtn.style.display = "none";
+});
 
-        if (!deferredPrompt) {
-
-            showToast(
-                "Install not available."
-            );
-
-            return;
-
-        }
-
-        deferredPrompt.prompt();
-
-        await deferredPrompt.userChoice;
-
-        deferredPrompt = null;
-
-        installBtn.style.display = "none";
-
-    }
-);
-
-window.addEventListener(
-    "appinstalled",
-    () => {
-
-        showToast(
-            "Rubik Solver installed!"
-        );
-
-        installBtn.style.display = "none";
-
-    }
-);
 /* ==========================================
    Color Picker
 ========================================== */
@@ -252,271 +161,125 @@ const colorUsage = {
     green: 0
 };
 
-// Default selected color
 setActiveColor("white");
 
 colorButtons.forEach(button => {
-
     button.addEventListener("click", () => {
-
         const color = button.dataset.color;
-
         setActiveColor(color);
-
     });
-
 });
 
 function setActiveColor(color) {
-
     appState.selectedColor = color;
-
-    colorButtons.forEach(btn => {
-
-        btn.classList.remove("active");
-
-    });
-
-    document
-        .querySelector(`[data-color="${color}"]`)
-        .classList.add("active");
-
+    colorButtons.forEach(btn => btn.classList.remove("active"));
+    document.querySelector(`[data-color="${color}"]`).classList.add("active");
 }
 
 function updateColorCounters() {
-
     Object.keys(colorUsage).forEach(color => {
-
-        colorCounters[color].textContent =
-            `${colorUsage[color]}/9`;
-
-        const button =
-            document.querySelector(`[data-color="${color}"]`);
-
-        button.disabled =
-            colorUsage[color] >= 9;
-
+        if (colorCounters[color]) {
+            colorCounters[color].textContent = `${colorUsage[color]}/9`;
+        }
+        const button = document.querySelector(`[data-color="${color}"]`);
+        if (button) button.disabled = colorUsage[color] >= 9;
     });
-
 }
+
 /* ==========================================
    Cube Data
 ========================================== */
 
-const FACE_NAMES = [
-    "U",
-    "R",
-    "F",
-    "D",
-    "L",
-    "B"
-];
+const FACE_NAMES = ["U", "R", "F", "D", "L", "B"];
 
 const cubeState = {
-
     U: Array(9).fill(null),
     R: Array(9).fill(null),
     F: Array(9).fill(null),
     D: Array(9).fill(null),
     L: Array(9).fill(null),
     B: Array(9).fill(null)
-
 };
 
-const filledCount =
-document.getElementById("filled-count");
-
-const validateBtn =
-document.getElementById("validate-btn");
-
-const solveBtn =
-document.getElementById("solve-btn");
-
-const previousFaceBtn =
-document.getElementById("previous-face");
-
-const nextFaceBtn =
-document.getElementById("next-face");
-
-/* ==========================================
-   Face Counter
-========================================== */
+const filledCount = document.getElementById("filled-count");
+const validateBtn = document.getElementById("validate-btn");
+const solveBtn = document.getElementById("solve-btn");
+const previousFaceBtn = document.getElementById("previous-face");
+const nextFaceBtn = document.getElementById("next-face");
 
 function updateFaceCounter() {
-
-    document.getElementById("face-counter").textContent =
-        `${appState.currentFace + 1} / ${appState.totalFaces}`;
-
-    document.getElementById("face-progress").value =
-        appState.currentFace + 1;
-
+    document.getElementById("face-counter").textContent = `${appState.currentFace + 1} / ${appState.totalFaces}`;
+    document.getElementById("face-progress").value = appState.currentFace + 1;
 }
 
-/* ==========================================
-   Filled Counter
-========================================== */
-
 function updateFilledCounter() {
-
     let total = 0;
-
     Object.values(cubeState).forEach(face => {
-
         face.forEach(sticker => {
-
-            if (sticker !== null) {
-
-                total++;
-
-            }
-
+            if (sticker !== null) total++;
         });
-
     });
 
     appState.filledStickers = total;
-
-    filledCount.textContent =
-        `${total} / 54`;
-
+    if (filledCount) filledCount.textContent = `${total} / 54`;
 }
-
-/* ==========================================
-   Validate Button
-========================================== */
 
 function updateValidateButton() {
-
-    if (appState.filledStickers === 54) {
-
-        validateBtn.disabled = false;
-
-    } else {
-
-        validateBtn.disabled = true;
-
-    }
-
+    if (validateBtn) validateBtn.disabled = appState.filledStickers !== 54;
 }
 
-/* ==========================================
-   Cube Validation
-========================================== */
-
 function validateCube() {
-
-    console.log("validateCube called");
-
-    const counts = {
-        U: 0,
-        R: 0,
-        F: 0,
-        D: 0,
-        L: 0,
-        B: 0
-    };
+    const counts = { U: 0, R: 0, F: 0, D: 0, L: 0, B: 0 };
 
     for (const face of Object.keys(cubeState)) {
-
         for (const sticker of cubeState[face]) {
-
             if (sticker === null) {
-
                 showToast("Complete all 54 stickers.");
-
                 return false;
-
             }
-
             if (!(sticker in counts)) {
-
                 showToast("Invalid sticker detected.");
-
                 return false;
-
             }
-
             counts[sticker]++;
-
         }
-
     }
 
     for (const face of Object.keys(counts)) {
-
-    if (counts[face] !== 9) {
-
-        alert(face + " = " + counts[face]);
-
-        return false;
-
+        if (counts[face] !== 9) {
+            showToast(`${face} face count is incorrect.`);
+            return false;
+        }
     }
 
+    appState.cubeValidated = true;
+    showToast("Cube validation successful.");
+    return true;
 }
-
-    console.log(counts);
-alert(JSON.stringify(counts));
-
-appState.cubeValidated = true;
-
-showToast("Cube validation successful.");
-
-return true;
-
-}
-
-/* ==========================================
-   Validate Button Event
-========================================== */
 
 validateBtn.addEventListener("click", () => {
-
-
-    console.log("Validate button clicked");
-
     if (validateCube()) {
-
-
         solveBtn.disabled = false;
         solveBtn.classList.remove("hidden");
-
     }
-
 });
 
-/* ==========================================
-   Solve Button Event
-========================================== */
-
 solveBtn.addEventListener("click", () => {
-
     if (!appState.cubeValidated) {
         showToast("Validate cube first.");
         return;
     }
-
-    solveCube(cubeState);
-
+    solveCube();
 });
 
-/* ==========================================
-   Refresh UI
-========================================== */
-
 function refreshEditor() {
-
     updateFaceCounter();
-
     updateFilledCounter();
-
     updateValidateButton();
-
     updateColorCounters();
-
 }
 
 refreshEditor();
-
 solveBtn.disabled = true;
 
 /* ==========================================
@@ -553,84 +316,30 @@ function getStickerIndex(cubie, faceLetter) {
 ========================================== */
 
 const viewer = document.getElementById("viewer");
-
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x101826);
 
-const camera = new THREE.PerspectiveCamera(
-    35,
-    viewer.clientWidth / viewer.clientHeight,
-    0.1,
-    1000
-);
-
-camera.position.set(4.5,4.5,4.5);
-
-const renderer = new THREE.WebGLRenderer({
-    antialias: true,
-    alpha: true
-});
-
-renderer.setPixelRatio(window.devicePixelRatio);
-
-renderer.setSize(
-    viewer.clientWidth,
-    viewer.clientHeight
-);
-
-viewer.appendChild(renderer.domElement);
-
+const camera = new THREE.PerspectiveCamera(35, viewer.clientWidth / viewer.clientHeight, 0.1, 1000);
 camera.position.set(0, 0, 8);
 camera.lookAt(0, 0, 0);
 
-/* ==========================================
-   Lights
-========================================== */
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+viewer.appendChild(renderer.domElement);
 
-const ambientLight = new THREE.AmbientLight(
-    0xffffff,
-    2
-);
-
+const ambientLight = new THREE.AmbientLight(0xffffff, 2);
 scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(
-    0xffffff,
-    3
-);
-
+const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
 directionalLight.position.set(5, 10, 7);
-
 scene.add(directionalLight);
 
 /* ==========================================
-   Orbit Controls
-========================================== */
-/*
-const controls = new OrbitControls(
-    camera,
-    renderer.domElement
-);
-
-controls.target.set(0, 0, 0);
-controls.update();
-
-controls.enableDamping = false;
-
-controls.enableRotate = false;
-controls.enableZoom = false;
-controls.enablePan = false;
-
-camera.position.set(0,0,8);
-camera.lookAt(0,0,0);*/
-
-
-/* ==========================================
-   Rubik's Cube (27 Cubies)
+   Rubik's Cube Setup
 ========================================== */
 
 const rubiksCube = new THREE.Group();
-
 const cubieSize = 0.95;
 const gap = 0.05;
 
@@ -646,299 +355,189 @@ const colorMap = {
 for (let x = -1; x <= 1; x++) {
     for (let y = -1; y <= 1; y++) {
         for (let z = -1; z <= 1; z++) {
+            const materials = Array(6).fill().map(() => new THREE.MeshStandardMaterial({ color: 0x222222 }));
+            const cubie = new THREE.Mesh(new THREE.BoxGeometry(cubieSize, cubieSize, cubieSize), materials);
+            cubie.position.set(x * (cubieSize + gap), y * (cubieSize + gap), z * (cubieSize + gap));
 
-            const materials = [
+            cubie.userData = {
+                x, y, z,
+                painted: [null, null, null, null, null, null]
+            };
 
-    new THREE.MeshStandardMaterial({ color: 0x222222 }),
-    new THREE.MeshStandardMaterial({ color: 0x222222 }),
-    new THREE.MeshStandardMaterial({ color: 0x222222 }),
-    new THREE.MeshStandardMaterial({ color: 0x222222 }),
-    new THREE.MeshStandardMaterial({ color: 0x222222 }),
-    new THREE.MeshStandardMaterial({ color: 0x222222 })
-
-];
-
-            const cubie = new THREE.Mesh(
-                new THREE.BoxGeometry(
-                    cubieSize,
-                    cubieSize,
-                    cubieSize
-                ),
-                materials
-            );
-
-            cubie.position.set(
-    x * (cubieSize + gap),
-    y * (cubieSize + gap),
-    z * (cubieSize + gap)
-);
-
-const isCenterCubie =
-    x === 0 &&
-    y === 0 &&
-    z === 0;
-    
-    if (isCenterCubie) {
-    console.log("Center Cubie Created");
-}
-
-cubie.userData = {
-    x,
-    y,
-    z,
-
-    painted: [null, null, null, null, null, null],
-    original: [null, null, null, null, null, null],
-
-    stickers: [
-        { face: "R", index: -1 },
-        { face: "L", index: -1 },
-        { face: "U", index: -1 },
-        { face: "D", index: -1 },
-        { face: "F", index: -1 },
-        { face: "B", index: -1 }
-    ]
-};
-
-rubiksCube.add(cubie);
-
+            rubiksCube.add(cubie);
         }
     }
 }
 
 scene.add(rubiksCube);
-
-rubiksCube.position.set(0, 0, 0);
-
 const cubeRotation = new CubeRotation(rubiksCube);
 
-const stickers = [];
-
-const stickerSize = 0.82;
-
 /* ==========================================
-   Cube Orientation
-========================================== */
-
-
-
-
-/* ==========================================
-   Raycaster
+   Raycaster & Click Events
 ========================================== */
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
-renderer.domElement.addEventListener(
-    "pointerdown",
-    onPointerDown
-);
+renderer.domElement.addEventListener("pointerdown", onPointerDown);
 
 function onPointerDown(event) {
-
     const rect = renderer.domElement.getBoundingClientRect();
-
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
     raycaster.setFromCamera(mouse, camera);
-
     const intersects = raycaster.intersectObjects(rubiksCube.children);
 
     if (intersects.length === 0) return;
 
     const hit = intersects[0];
     const cubie = hit.object;
+    const faceIndex = Math.floor(hit.faceIndex / 2);
+    const previousColor = cubie.userData.painted[faceIndex];
+    const faceLetter = ["R", "L", "U", "D", "F", "B"][faceIndex];
 
-    // எந்த face-ஐ click செய்தோம்?
-const faceIndex = Math.floor(hit.faceIndex / 2);
+    const x = cubie.userData.x;
+    const y = cubie.userData.y;
+    const z = cubie.userData.z;
 
-const previousColor = cubie.userData.painted[faceIndex];
+    if (
+        (faceLetter === "R" && x !== 1) ||
+        (faceLetter === "L" && x !== -1) ||
+        (faceLetter === "U" && y !== 1) ||
+        (faceLetter === "D" && y !== -1) ||
+        (faceLetter === "F" && z !== 1) ||
+        (faceLetter === "B" && z !== -1)
+    ) {
+        return;
+    }
 
-const faceLetter = ["R","L","U","D","F","B"][faceIndex];
+    if (previousColor !== appState.selectedColor && colorUsage[appState.selectedColor] >= 9) {
+        showToast(appState.selectedColor + " limit reached (9/9)");
+        return;
+    }
 
-const x = cubie.userData.x;
-const y = cubie.userData.y;
-const z = cubie.userData.z;
+    if (previousColor === appState.selectedColor) return;
 
-if (
-    (faceLetter === "R" && x !== 1) ||
-    (faceLetter === "L" && x !== -1) ||
-    (faceLetter === "U" && y !== 1) ||
-    (faceLetter === "D" && y !== -1) ||
-    (faceLetter === "F" && z !== 1) ||
-    (faceLetter === "B" && z !== -1)
-) {
-    return;
-}
+    if (previousColor) colorUsage[previousColor]--;
 
-if (
-    previousColor !== appState.selectedColor &&
-    colorUsage[appState.selectedColor] >= 9
-) {
-    showToast(appState.selectedColor + " limit reached (9/9)");
-    return;
-}
+    cubie.userData.painted[faceIndex] = appState.selectedColor;
+    colorUsage[appState.selectedColor]++;
+    cubie.material[faceIndex].color.setHex(colorMap[appState.selectedColor]);
 
-if (previousColor === appState.selectedColor) {
-    return;
-}
+    const stickerIndex = getStickerIndex(cubie, faceLetter);
+    cubeState[faceLetter][stickerIndex] = COLOR_TO_FACE[appState.selectedColor];
 
-if (previousColor) {
-    colorUsage[previousColor]--;
-}
+    updateFilledCounter();
+    updateValidateButton();
+    updateColorCounters();
 
-cubie.userData.painted[faceIndex] = appState.selectedColor;
-
-colorUsage[appState.selectedColor]++;
-
-cubie.material[faceIndex].color.setHex(
-    colorMap[appState.selectedColor]
-);
-
-const stickerIndex = getStickerIndex(cubie, faceLetter);
-
-cubeState[faceLetter][stickerIndex] =
-    COLOR_TO_FACE[appState.selectedColor];
-    
-
-updateFilledCounter();
-updateValidateButton();
-updateColorCounters();
-
-showToast(appState.selectedColor + " Applied");
-
+    showToast(appState.selectedColor + " Applied");
 }
 
 /* ==========================================
-   Animation Loop
+   Animation Loop & Controls
 ========================================== */
 
-let firstFrame = true;
-
 function animate() {
-
-    if (firstFrame) {
-    
-        firstFrame = false;
-    }
-
     requestAnimationFrame(animate);
-
     cubeRotation.update();
-
     renderer.render(scene, camera);
-
 }
-
-
 animate();
 
-const faceRotations = [
-    null,
-    "right",
-    "up",
-    "right",
-    "right",
-    "up"
-];
-
-function debugRotation(move) {
-    console.log(
-        "Face:",
-        appState.currentFace,
-        "Move:",
-        move,
-        "Quaternion:",
-        rubiksCube.quaternion.toArray()
-    );
-}
-
-function showCurrentFace() {
-    updateFaceCounter();
-}
+const faceRotations = [null, "right", "up", "right", "right", "up"];
 
 nextFaceBtn.addEventListener("click", () => {
-
-    if (cubeRotation.isAnimating()) return;
-
-    if (appState.currentFace >= 5) return;
-
+    if (cubeRotation.isAnimating() || appState.currentFace >= 5) return;
     appState.currentFace++;
-
     const move = faceRotations[appState.currentFace];
-
-    if (move) {
-    debugRotation(move);
-    cubeRotation.rotate(move);
-}
-
-    showCurrentFace();
-
+    if (move) cubeRotation.rotate(move);
+    updateFaceCounter();
 });
 
 previousFaceBtn.addEventListener("click", () => {
-
-    if (cubeRotation.isAnimating()) return;
-
-    if (appState.currentFace <= 0) return;
-
+    if (cubeRotation.isAnimating() || appState.currentFace <= 0) return;
     const move = faceRotations[appState.currentFace];
-
-    if (move === "right") {
-        cubeRotation.rotate("left");
-    } else if (move === "up") {
-        cubeRotation.rotate("down");
-    }
-
+    if (move === "right") cubeRotation.rotate("left");
+    else if (move === "up") cubeRotation.rotate("down");
     appState.currentFace--;
+    updateFaceCounter();
+});
 
-    showCurrentFace();
-
+window.addEventListener("resize", () => {
+    camera.aspect = viewer.clientWidth / viewer.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(viewer.clientWidth, viewer.clientHeight);
 });
 
 /* ==========================================
    Kociemba Solver & 3D Animation Integration
 ========================================== */
+
+function getCubeString() {
+    const order = ["U", "R", "F", "D", "L", "B"];
+    let result = "";
+
+    for (const face of order) {
+        if (!cubeState[face] || cubeState[face].includes(null)) {
+            throw new Error(`Face ${face} is incomplete!`);
+        }
+        result += cubeState[face].join("");
+    }
+
+    return result;
+}
+
 let isSolvingAnimation = false;
 
-async function solveCube(cubeState) {
+async function solveCube() {
     if (isSolvingAnimation) return;
 
-    const cubeString = getCubeString();
-
     try {
-        // Kociemba Algorithm Execution
-        const cube = Cube.fromString(cubeString);
-
-        if (cube.isSolved()) {
-            showToast("Cube is already solved!");
+        if (typeof Cube === 'undefined') {
+            showToast("Solver library not loaded!");
             return;
         }
 
-        const solution = cube.solve();
+        const cubeString = getCubeString();
+        console.log("Kociemba String:", cubeString);
 
-        if (!solution || solution.trim() === "") {
-            showToast("Cube is already solved!");
-            return;
-        }
+        showToast("Calculating Solution...");
 
-        const moves = solution.trim().split(/\s+/);
-        showToast(`Solved in ${moves.length} moves! Animating...`);
+        setTimeout(() => {
+            try {
+                const cube = Cube.fromString(cubeString);
 
-        // Start step-by-step 3D rotation animation
-        playSolutionQueue(moves);
+                if (cube.isSolved()) {
+                    showToast("Cube is already solved!");
+                    return;
+                }
+
+                const solution = cube.solve();
+                console.log("Solution Moves:", solution);
+
+                if (!solution || solution.trim() === "") {
+                    showToast("Cube is already solved!");
+                    return;
+                }
+
+                const moves = solution.trim().split(/\s+/);
+                showToast(`Solved in ${moves.length} moves! Animating...`);
+
+                playSolutionQueue(moves);
+            } catch (solveErr) {
+                console.error("Solve Error:", solveErr);
+                showToast("Invalid Cube configuration! Check sticker colors.");
+            }
+        }, 100);
 
     } catch (e) {
-        console.error("Solver Error:", e);
-        showToast("Invalid cube configuration! Check sticker colors.");
+        console.error("Parsing Error:", e);
+        showToast("Please fill all 54 stickers correctly!");
     }
 }
 
-/* ==========================================
-   3D Slice Rotation Engine (Queue Execution)
-========================================== */
 function playSolutionQueue(moves) {
     isSolvingAnimation = true;
     solveBtn.disabled = true;
@@ -950,6 +549,7 @@ function playSolutionQueue(moves) {
         if (index >= moves.length) {
             showToast("Cube Solved Successfully!");
             isSolvingAnimation = false;
+            solveBtn.disabled = false;
             validateBtn.disabled = false;
             appState.cubeSolved = true;
             return;
@@ -966,14 +566,13 @@ function rotateSlice(moveStr, callback) {
     const face = moveStr[0];
     const modifier = moveStr.slice(1);
 
-    let angle = -Math.PI / 2; // Default Clockwise
-    if (modifier === "'") angle = Math.PI / 2; // Counter-clockwise
-    if (modifier === "2") angle = -Math.PI;   // 180-degree turn
+    let angle = -Math.PI / 2;
+    if (modifier === "'") angle = Math.PI / 2;
+    if (modifier === "2") angle = -Math.PI;
 
     let axis = "y";
     let layerVal = cubieSize + gap;
 
-    // Axis & Direction Assignment for Rubik Notation
     if (face === "U") { axis = "y"; layerVal = cubieSize + gap; angle = -angle; }
     if (face === "D") { axis = "y"; layerVal = -(cubieSize + gap); }
     if (face === "R") { axis = "x"; layerVal = cubieSize + gap; angle = -angle; }
@@ -981,7 +580,6 @@ function rotateSlice(moveStr, callback) {
     if (face === "F") { axis = "z"; layerVal = cubieSize + gap; angle = -angle; }
     if (face === "B") { axis = "z"; layerVal = -(cubieSize + gap); }
 
-    // Temporary Pivot Group for rotating current layer cubies
     const pivot = new THREE.Group();
     scene.add(pivot);
 
@@ -997,7 +595,7 @@ function rotateSlice(moveStr, callback) {
     targets.forEach(c => pivot.attach(c));
 
     let start = null;
-    const duration = 220; // Ms per rotation step
+    const duration = 200;
 
     function animateTurn(timestamp) {
         if (!start) start = timestamp;
@@ -1012,7 +610,6 @@ function rotateSlice(moveStr, callback) {
             pivot.rotation[axis] = angle;
             pivot.updateMatrixWorld();
 
-            // Re-attach cubies back to main cube group and snap position
             targets.forEach(c => {
                 rubiksCube.attach(c);
                 c.position.x = Math.round(c.position.x * 100) / 100;
@@ -1027,43 +624,3 @@ function rotateSlice(moveStr, callback) {
 
     requestAnimationFrame(animateTurn);
 }
-
-
-function getCubeString() {
-
-    let result = "";
-
-    const order = ["U", "R", "F", "D", "L", "B"];
-
-    for (const face of order) {
-
-        result += cubeState[face].join("");
-
-    }
-
-    return result;
-
-}
-
-/* ==========================================
-   Window Resize
-========================================== */
-
-window.addEventListener(
-    "resize",
-    () => {
-
-        camera.aspect =
-            viewer.clientWidth /
-            viewer.clientHeight;
-
-        camera.updateProjectionMatrix();
-
-        renderer.setSize(
-            viewer.clientWidth,
-            viewer.clientHeight
-        );
-
-    }
-);
-
