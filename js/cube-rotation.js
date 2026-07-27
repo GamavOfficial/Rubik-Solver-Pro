@@ -4,12 +4,16 @@ export class CubeRotation {
 
     constructor(rubiksCube) {
 
-        this.cubeGroup = rubiksCube; // Main Rubiks Cube Group
+        this.cube = rubiksCube;
+
         this.animating = false;
+
         this.rotationSpeed = 0.12;
 
-        this.currentQuaternion = this.cubeGroup.quaternion.clone();
-        this.targetQuaternion = this.cubeGroup.quaternion.clone();
+        this.currentQuaternion = this.cube.quaternion.clone();
+
+        this.targetQuaternion = this.cube.quaternion.clone();
+
         this.currentView = 0;
 
         this.sequence = [
@@ -22,6 +26,7 @@ export class CubeRotation {
 
         // History array to store previous target quaternions for reverse operation
         this.history = [];
+
     }
 
     // Sequence-la irundhu NEXT step rotate panna
@@ -33,7 +38,7 @@ export class CubeRotation {
         // Push current target to history before moving to next step
         this.history.push(this.targetQuaternion.clone());
         
-        this.rotateView(direction);
+        this.rotate(direction);
         this.currentView++;
     }
 
@@ -42,7 +47,7 @@ export class CubeRotation {
         if (this.animating || this.history.length === 0) return;
 
         this.animating = true;
-        this.currentQuaternion.copy(this.cubeGroup.quaternion);
+        this.currentQuaternion.copy(this.cube.quaternion);
 
         // Pop the previous exact quaternion state
         const prevTarget = this.history.pop();
@@ -53,38 +58,96 @@ export class CubeRotation {
         }
     }
 
-    rotateView(direction) {
+    rotate(direction) {
+
         if (this.animating) return;
 
         this.animating = true;
-        this.currentQuaternion.copy(this.cubeGroup.quaternion);
+
+        this.currentQuaternion.copy(this.cube.quaternion);
 
         const rotation = new THREE.Quaternion();
 
         switch (direction) {
+
             case "right":
-                rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
+                rotation.setFromAxisAngle(
+                    new THREE.Vector3(0, 1, 0),
+                    -Math.PI / 2
+                );
                 break;
+
             case "left":
-                rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+                rotation.setFromAxisAngle(
+                    new THREE.Vector3(0, 1, 0),
+                    Math.PI / 2
+                );
                 break;
+
             case "up":
-                rotation.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+                rotation.setFromAxisAngle(
+                    new THREE.Vector3(1, 0, 0),
+                    Math.PI / 2
+                );
                 break;
+
             case "down":
-                rotation.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+                rotation.setFromAxisAngle(
+                    new THREE.Vector3(1, 0, 0),
+                    -Math.PI / 2
+                );
                 break;
+
             default:
                 this.animating = false;
                 return;
+
         }
 
+        // PREMULTIPLY applies screen/camera-relative rotation
+        // Idhu dhaan unga Quaternion sequence values-a exact-a matching panna vaikkum
         this.targetQuaternion.copy(this.currentQuaternion);
-        this.targetQuaternion.premultiply(rotation);
-        this.targetQuaternion.normalize();
+
+this.targetQuaternion.premultiply(rotation);
+
+this.targetQuaternion.normalize();
+
     }
 
-    // [UPGRADED]: கியூப் சால்வ் மூவ்ஸ்களை (எ.கா: R, U, R', F2) லேயர் வாரியாக அனிமேட் செய்யும் பகுதி
+    update() {
+
+        if (!this.animating) return;
+
+        this.cube.quaternion.slerp(
+            this.targetQuaternion,
+            this.rotationSpeed
+        );
+
+        if (
+            this.cube.quaternion.angleTo(
+                this.targetQuaternion
+            ) < 0.01
+        ) {
+
+            this.cube.quaternion.copy(
+                this.targetQuaternion
+            );
+
+            this.animating = false;
+
+        }
+
+    }
+
+        isAnimating() {
+
+        return this.animating;
+
+    }
+
+    // ==========================================
+    // NEWLY ADDED: Execute Move for Solver Animation
+    // ==========================================
     executeMove(moveStr, callback) {
         if (this.animating) return;
         this.animating = true;
@@ -135,12 +198,11 @@ export class CubeRotation {
             angle = angle * 2;
         }
 
-        // தற்காலிகமாக குறிப்பிட்ட லேயரை மட்டும் திருப்புவதற்காக Pivot உருவாக்குதல்
         const pivot = new THREE.Group();
-        this.cubeGroup.add(pivot);
+        this.cube.add(pivot);
 
         const movingCubies = [];
-        this.cubeGroup.children.forEach(cubie => {
+        this.cube.children.forEach(cubie => {
             if (cubie.isMesh && layerCheck(cubie)) {
                 movingCubies.push(cubie);
             }
@@ -150,7 +212,7 @@ export class CubeRotation {
             pivot.attach(cubie);
         });
 
-        const duration = 250; // Animation Speed (ms)
+        const duration = 200;
         const startTime = performance.now();
 
         const animateMove = (currentTime) => {
@@ -167,7 +229,7 @@ export class CubeRotation {
                 pivot.updateMatrixWorld(true);
 
                 movingCubies.forEach(cubie => {
-                    this.cubeGroup.attach(cubie);
+                    this.cube.attach(cubie);
                     
                     cubie.position.x = Math.round(cubie.position.x);
                     cubie.position.y = Math.round(cubie.position.y);
@@ -178,7 +240,7 @@ export class CubeRotation {
                     cubie.rotation.z = Math.round(cubie.rotation.z / (Math.PI / 2)) * (Math.PI / 2);
                 });
 
-                this.cubeGroup.remove(pivot);
+                this.cube.remove(pivot);
                 this.animating = false;
 
                 if (typeof callback === "function") {
@@ -190,23 +252,6 @@ export class CubeRotation {
         requestAnimationFrame(animateMove);
     }
 
-    update() {
-        // Viewer-ன் முழு கியூப் ரொட்டேஷனுக்கான slerp அப்டேட்
-        if (this.cubeGroup.quaternion.angleTo(this.targetQuaternion) > 0.001) {
-            this.cubeGroup.quaternion.slerp(
-                this.targetQuaternion,
-                this.rotationSpeed
-            );
-            this.animating = true;
-        } else {
-            this.cubeGroup.quaternion.copy(this.targetQuaternion);
-            // layer animation இல்லாத போது மட்டும் animating false செய்யப்படும்
-        }
-    }
-
-    isAnimating() {
-        return this.animating;
-    }
-
 }
+
 
