@@ -70,22 +70,28 @@ function showToast(message) {
 
 async function startSplash() {
 
-    let progress = 0;
+    const loadingProgress = document.getElementById("loading-progress");
+    if (loadingProgress) {
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += 5;
+            if (progress > 100) {
+                progress = 100;
+                clearInterval(interval);
+            }
+            loadingProgress.style.width = progress + "%";
+        }, 15);
+    }
 
-    const interval = setInterval(() => {
-        progress += 4;
-        if (progress > 100) {
-            progress = 100;
-            clearInterval(interval);
-        }
-        loadingProgress.style.width = progress + "%";
-    }, 20);
-
-    // 3 விநாடிகள் அல்லது அசெட் லோட் ஆனதும் ஸ்பேஸை மறைக்க
+    // 1.5 விநாடிகள் கழித்து கட்டாயம் ஸ்பிளாஸ் ஸ்கிரினை மறைக்க
     await sleep(1500);
 
-    splashScreen.classList.add("hidden");
-    mainApp.classList.remove("hidden");
+    if (splashScreen) {
+        splashScreen.style.display = "none"; // கிளாஸ்க்கு பதிலாக நேரடியாக மறைக்க
+    }
+    if (mainApp) {
+        mainApp.classList.remove("hidden");
+    }
 
     try {
         camera.aspect = viewer.clientWidth / viewer.clientHeight;
@@ -99,6 +105,7 @@ async function startSplash() {
     showToast("Welcome to Rubik Solver Pro");
 
 }
+
 
 
 // ---------- Start App ----------
