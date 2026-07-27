@@ -2,11 +2,62 @@ import * as THREE from "three";
 import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
-/* ==========================================
-   Rubik Solver Pro - Final Verified Code
-========================================== */
+/* ============================================================
+   ரூபிக்ஸ் கியூப் சால்வர் புரோ - Complete Merged Master Script
+============================================================ */
 
-// Kociemba Initialization
+// ------------------------------------------------------------
+// 1. உலகளாவிய நிலைகள் (Global Application State)
+// ------------------------------------------------------------
+const FACES_MAP = {
+    'UP': 'U',
+    'DOWN': 'D',
+    'FRONT': 'F',
+    'BACK': 'B',
+    'LEFT': 'L',
+    'RIGHT': 'R'
+};
+
+const FACE_NAMES = ['UP', 'DOWN', 'FRONT', 'BACK', 'LEFT', 'RIGHT'];
+const DEFAULT_COLORS = ['white', 'yellow', 'red', 'orange', 'blue', 'green'];
+
+// 6 பக்கங்களின் 54 கட்டங்கள் (U, D, F, B, L, R)
+const cubeState = {
+    U: Array(9).fill('white'),
+    D: Array(9).fill('yellow'),
+    F: Array(9).fill('red'),
+    B: Array(9).fill('orange'),
+    L: Array(9).fill('blue'),
+    R: Array(9).fill('green')
+};
+
+const colorMapHex = {
+    white: 0xffffff,
+    yellow: 0xffff00,
+    red: 0xff0000,
+    orange: 0xff8800,
+    blue: 0x0000ff,
+    green: 0x00aa00
+};
+
+const appState = {
+    currentFaceIndex: 0,
+    currentEditorFace: 'FRONT',
+    selectedColor: 'white',
+    filledStickers: 54,
+    cubeValidated: false,
+    cubeSolved: false
+};
+
+// அனிமேஷன் மற்றும் நகர்வு மாறிகள் (Queue & Step Controls)
+let moveQueue = [];
+let currentMoveIndex = 0;
+let isPlaying = false;
+let isAnimatingSlice = false;
+let autoPlayTimer = null;
+const PLAY_SPEED_MS = 800; // தானியங்கி வேக இடைவெளி
+
+// Kociemba Solver தொடக்கம்
 if (typeof Cube !== 'undefined' && Cube.initSolver) {
     try {
         Cube.initSolver();
@@ -15,227 +66,290 @@ if (typeof Cube !== 'undefined' && Cube.initSolver) {
     }
 }
 
-// DOM Elements
-const splashScreen = document.getElementById("splash-screen");
-const mainApp = document.getElementById("main-app");
-const loadingProgress = document.getElementById("loading-progress");
-const toast = document.getElementById("toast");
-
-// App State
-const appState = {
-    currentFace: 0,
-    totalFaces: 6,
-    selectedColor: "white",
-    filledStickers: 0,
-    cubeValidated: false,
-    cubeSolved: false,
-    solving: false
-};
+// ------------------------------------------------------------
+// 2. பக்கம் துவக்கம் & UI நிகழ்வுகள் (Initialization & UI)
+// ------------------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+    initSplashScreen();
+    initThemeSystem();
+    initColorPicker();
+    initFaceSelector();
+    renderEditorGrid();
+    setupEventListeners();
+    initThreeJS();
+});
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function showToast(message) {
+    const toast = document.getElementById("toast");
     if (!toast) return;
     toast.textContent = message;
     toast.classList.add("show");
-    setTimeout(() => {
-        toast.classList.remove("show");
-    }, 2500);
+    setTimeout(() => toast.classList.remove("show"), 2500);
 }
 
 // Splash Screen
-async function startSplash() {
+async function initSplashScreen() {
+    const splashScreen = document.getElementById("splash-screen");
+    const mainApp = document.getElementById("main-app");
+    const loadingProgress = document.getElementById("loading-progress");
+
     let progress = 0;
     while (progress <= 100) {
         if (loadingProgress) loadingProgress.style.width = progress + "%";
-        await sleep(15);
+        await sleep(10);
         progress++;
     }
 
     if (splashScreen) splashScreen.classList.add("hidden");
     if (mainApp) mainApp.classList.remove("hidden");
 
-    setTimeout(() => {
+    if (renderer && camera && viewer) {
         camera.aspect = viewer.clientWidth / viewer.clientHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(viewer.clientWidth, viewer.clientHeight);
-        renderer.render(scene, camera);
-    }, 100);
-
+    }
     showToast("Welcome to Rubik Solver Pro");
 }
 
-window.addEventListener("load", () => {
-    startSplash();
-});
-
 // Theme System
-const themeBtn = document.getElementById("theme-btn");
-let currentTheme = localStorage.getItem("theme") || "dark";
-applyTheme(currentTheme);
+function initThemeSystem() {
+    const themeBtn = document.getElementById("theme-btn");
+    let currentTheme = localStorage.getItem("theme") || "dark";
+    applyTheme(currentTheme);
 
-if (themeBtn) {
-    themeBtn.addEventListener("click", () => {
-        currentTheme = currentTheme === "dark" ? "light" : "dark";
-        applyTheme(currentTheme);
-    });
+    if (themeBtn) {
+        themeBtn.addEventListener("click", () => {
+            currentTheme = currentTheme === "dark" ? "light" : "dark";
+            applyTheme(currentTheme);
+        });
+    }
 }
 
 function applyTheme(theme) {
     document.body.setAttribute("data-theme", theme);
     localStorage.setItem("theme", theme);
+    const themeBtn = document.getElementById("theme-btn");
     if (themeBtn) themeBtn.textContent = theme === "dark" ? "🌙" : "☀️";
 }
 
-// Color Picker Setup
-const colorButtons = document.querySelectorAll(".color-btn");
+// ------------------------------------------------------------
+// 3. 2D எடிட்டர் & கலர் பிக்கர் (2D Grid & Color Picker)
+// ------------------------------------------------------------
+function initColorPicker() {
+    const pickerContainer = document.getElementById('color-picker');
+    if (!pickerContainer) return;
 
-const colorCounters = {
-    white: document.getElementById("count-white"),
-    yellow: document.getElementById("count-yellow"),
-    red: document.getElementById("count-red"),
-    orange: document.getElementById("count-orange"),
-    blue: document.getElementById("count-blue"),
-    green: document.getElementById("count-green")
-};
-
-const colorUsage = {
-    white: 0,
-    yellow: 0,
-    red: 0,
-    orange: 0,
-    blue: 0,
-    green: 0
-};
-
-setActiveColor("white");
-
-colorButtons.forEach(button => {
-    button.addEventListener("click", () => {
-        const color = button.dataset.color;
-        setActiveColor(color);
+    pickerContainer.innerHTML = '';
+    DEFAULT_COLORS.forEach(color => {
+        const colorBtn = document.createElement('div');
+        colorBtn.className = `color-btn ${color === appState.selectedColor ? 'selected' : ''}`;
+        colorBtn.style.backgroundColor = color;
+        colorBtn.setAttribute('data-color', color);
+        
+        colorBtn.addEventListener('click', () => {
+            appState.selectedColor = color;
+            document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected', 'active'));
+            colorBtn.classList.add('selected', 'active');
+        });
+        
+        pickerContainer.appendChild(colorBtn);
     });
-});
-
-function setActiveColor(color) {
-    appState.selectedColor = color;
-    colorButtons.forEach(btn => btn.classList.remove("active"));
-    const activeBtn = document.querySelector(`[data-color="${color}"]`);
-    if (activeBtn) activeBtn.classList.add("active");
 }
 
-function updateColorCounters() {
-    Object.keys(colorUsage).forEach(color => {
-        if (colorCounters[color]) {
-            colorCounters[color].textContent = `${colorUsage[color]}/9`;
+function initFaceSelector() {
+    const selectorContainer = document.getElementById('face-selector');
+    if (!selectorContainer) return;
+
+    selectorContainer.innerHTML = '';
+    FACE_NAMES.forEach(faceName => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.innerText = faceName;
+        btn.className = `face-btn ${faceName === appState.currentEditorFace ? 'active' : ''}`;
+        
+        btn.addEventListener('click', () => {
+            appState.currentEditorFace = faceName;
+            document.querySelectorAll('.face-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderEditorGrid();
+        });
+        
+        selectorContainer.appendChild(btn);
+    });
+}
+
+function renderEditorGrid() {
+    const gridContainer = document.getElementById('cube-grid');
+    if (!gridContainer) return;
+
+    gridContainer.innerHTML = '';
+    const faceCode = FACES_MAP[appState.currentEditorFace];
+    const currentStickers = cubeState[faceCode];
+
+    currentStickers.forEach((color, index) => {
+        const sticker = document.createElement('div');
+        sticker.className = 'sticker';
+        sticker.style.backgroundColor = color;
+
+        // நடுக் கட்டத்தை (Index 4) பூட்டுதல்
+        if (index === 4) {
+            sticker.classList.add('center-sticker');
+            sticker.title = "நடுக் கட்டத்தின் நிறத்தை மாற்ற முடியாது";
+        } else {
+            sticker.addEventListener('click', () => {
+                if (colorUsageCount(appState.selectedColor) >= 9 && cubeState[faceCode][index] !== appState.selectedColor) {
+                    showToast(`${appState.selectedColor} limit reached (9/9)`);
+                    return;
+                }
+                cubeState[faceCode][index] = appState.selectedColor;
+                sticker.style.backgroundColor = appState.selectedColor;
+                updateStickerCounts();
+                syncStateTo3DCube();
+            });
         }
-        const button = document.querySelector(`[data-color="${color}"]`);
-        if (button) button.disabled = colorUsage[color] >= 9;
+        gridContainer.appendChild(sticker);
     });
+
+    updateStickerCounts();
 }
 
-// Cube State Data Structure
-const cubeState = {
-    U: Array(9).fill(null),
-    R: Array(9).fill(null),
-    F: Array(9).fill(null),
-    D: Array(9).fill(null),
-    L: Array(9).fill(null),
-    B: Array(9).fill(null)
-};
-
-const filledCount = document.getElementById("filled-count");
-const validateBtn = document.getElementById("validate-btn");
-const solveBtn = document.getElementById("solve-btn");
-const previousFaceBtn = document.getElementById("previous-face");
-const nextFaceBtn = document.getElementById("next-face");
-
-function updateFaceCounter() {
-    const fc = document.getElementById("face-counter");
-    const fp = document.getElementById("face-progress");
-    if (fc) fc.textContent = `${appState.currentFace + 1} / ${appState.totalFaces}`;
-    if (fp) fp.value = appState.currentFace + 1;
-}
-
-function updateFilledCounter() {
-    let total = 0;
+function colorUsageCount(targetColor) {
+    let count = 0;
     Object.values(cubeState).forEach(face => {
-        face.forEach(sticker => {
-            if (sticker !== null) total++;
+        face.forEach(color => {
+            if (color === targetColor) count++;
+        });
+    });
+    return count;
+}
+
+function updateStickerCounts() {
+    const counts = { white: 0, yellow: 0, red: 0, orange: 0, blue: 0, green: 0 };
+    Object.values(cubeState).forEach(face => {
+        face.forEach(color => {
+            if (counts[color] !== undefined) counts[color]++;
         });
     });
 
-    appState.filledStickers = total;
-    if (filledCount) filledCount.textContent = `${total} / 54`;
-}
-
-function updateValidateButton() {
-    if (validateBtn) validateBtn.disabled = appState.filledStickers !== 54;
-}
-
-function validateCube() {
-    const counts = { white: 0, yellow: 0, red: 0, orange: 0, blue: 0, green: 0 };
-
-    for (const face of Object.keys(cubeState)) {
-        for (const sticker of cubeState[face]) {
-            if (sticker === null) {
-                showToast("Fill all 54 stickers first.");
-                return false;
-            }
-            if (sticker in counts) {
-                counts[sticker]++;
-            }
-        }
-    }
-
-    for (const color of Object.keys(counts)) {
-        if (counts[color] !== 9) {
-            showToast(`Each color must be exactly 9! ${color}: ${counts[color]}`);
-            return false;
-        }
-    }
-
-    appState.cubeValidated = true;
-    showToast("Validation successful!");
-    return true;
-}
-
-if (validateBtn) {
-    validateBtn.addEventListener("click", () => {
-        if (validateCube()) {
-            if (solveBtn) {
-                solveBtn.disabled = false;
-                solveBtn.classList.remove("hidden");
-            }
-        }
+    // திரையில் எண்ணிக்கை பரப்புதல்
+    Object.keys(counts).forEach(color => {
+        const countElem = document.getElementById(`count-${color}`);
+        if (countElem) countElem.textContent = `${counts[color]}/9`;
     });
+
+    const countDisplay = document.getElementById('sticker-counts');
+    if (countDisplay) {
+        countDisplay.innerText = `வெள்ளை: ${counts.white}/9 | மஞ்சள்: ${counts.yellow}/9 | சிவப்பு: ${counts.red}/9 | ஆரஞ்சு: ${counts.orange}/9 | நீலம்: ${counts.blue}/9 | பச்சை: ${counts.green}/9`;
+    }
+
+    const filledCount = document.getElementById("filled-count");
+    let totalFilled = Object.values(counts).reduce((a, b) => a + b, 0);
+    appState.filledStickers = totalFilled;
+    if (filledCount) filledCount.textContent = `${totalFilled} / 54`;
+
+    const validateBtn = document.getElementById("validate-btn");
+    if (validateBtn) validateBtn.disabled = (totalFilled !== 54);
 }
 
-if (solveBtn) {
-    solveBtn.addEventListener("click", () => {
-        if (!appState.cubeValidated) {
-            showToast("Validate face first.");
+// ------------------------------------------------------------
+// 4. Three.js 3D எஞ்சின் (3D Scene, Raycaster & Cubies)
+// ------------------------------------------------------------
+let viewer, scene, camera, renderer, rubiksCube, cubeRotation;
+const cubieSize = 0.95;
+const gap = 0.05;
+
+function initThreeJS() {
+    viewer = document.getElementById("viewer");
+    if (!viewer) return;
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x101826);
+
+    camera = new THREE.PerspectiveCamera(35, viewer.clientWidth / viewer.clientHeight, 0.1, 1000);
+    camera.position.set(0, 0, 8);
+    camera.lookAt(0, 0, 0);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+    viewer.appendChild(renderer.domElement);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 2);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
+    directionalLight.position.set(5, 10, 7);
+    scene.add(directionalLight);
+
+    // 3D Cubies உருவாக்கம்
+    rubiksCube = new THREE.Group();
+    for (let x = -1; x <= 1; x++) {
+        for (let y = -1; y <= 1; y++) {
+            for (let z = -1; z <= 1; z++) {
+                const materials = Array(6).fill().map(() => new THREE.MeshStandardMaterial({ color: 0x222222 }));
+                const cubie = new THREE.Mesh(new THREE.BoxGeometry(cubieSize, cubieSize, cubieSize), materials);
+                cubie.position.set(x * (cubieSize + gap), y * (cubieSize + gap), z * (cubieSize + gap));
+
+                cubie.userData = { x, y, z, painted: [null, null, null, null, null, null] };
+                rubiksCube.add(cubie);
+            }
+        }
+    }
+
+    scene.add(rubiksCube);
+    cubeRotation = new CubeRotation(rubiksCube);
+
+    // Pointer Raycasting for 3D clicks
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    renderer.domElement.addEventListener("pointerdown", (event) => {
+        if (isAnimatingSlice || isPlaying) return;
+
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(rubiksCube.children);
+
+        if (intersects.length === 0) return;
+
+        const hit = intersects[0];
+        const cubie = hit.object;
+        const faceIndex = Math.floor(hit.faceIndex / 2);
+        const faceLetter = ["R", "L", "U", "D", "F", "B"][faceIndex];
+
+        const stickerIndex = getStickerIndex(cubie, faceLetter);
+        if (stickerIndex === -1 || stickerIndex === 4) return; // Ignore centers or invalid
+
+        if (colorUsageCount(appState.selectedColor) >= 9 && cubeState[faceLetter][stickerIndex] !== appState.selectedColor) {
+            showToast(appState.selectedColor + " limit reached (9/9)");
             return;
         }
-        solveCube();
+
+        cubeState[faceLetter][stickerIndex] = appState.selectedColor;
+        cubie.material[faceIndex].color.setHex(colorMapHex[appState.selectedColor]);
+
+        renderEditorGrid();
+        updateStickerCounts();
+        showToast(appState.selectedColor + " Applied");
     });
+
+    syncStateTo3DCube();
+
+    function animate() {
+        requestAnimationFrame(animate);
+        if (cubeRotation) cubeRotation.update();
+        renderer.render(scene, camera);
+    }
+    animate();
 }
 
-function refreshEditor() {
-    updateFaceCounter();
-    updateFilledCounter();
-    updateValidateButton();
-    updateColorCounters();
-}
-
-refreshEditor();
-if (solveBtn) solveBtn.disabled = true;
-
-/* ==========================================
-   Sticker Indexing Logic
-========================================== */
 function getStickerIndex(cubie, faceLetter) {
     const x = cubie.userData.x;
     const y = cubie.userData.y;
@@ -246,177 +360,40 @@ function getStickerIndex(cubie, faceLetter) {
         case "D": return (1 - z) * 3 + (x + 1);
         case "F": return (1 - y) * 3 + (x + 1);
         case "B": return (1 - y) * 3 + (1 - x);
-        case "R": return (1 - y) * 3 + (z + 1);
-        case "L": return (1 - y) * 3 + (1 - z);
+        case "R": return (1 - y) * 3 + (1 - z);
+        case "L": return (1 - y) * 3 + (z + 1);
         default: return -1;
     }
 }
 
-// Three.js Scene Setup
-const viewer = document.getElementById("viewer");
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x101826);
+// 2D Data-வை 3D Mesh-உடன் இணைத்தல்
+function syncStateTo3DCube() {
+    if (!rubiksCube) return;
 
-const camera = new THREE.PerspectiveCamera(35, viewer.clientWidth / viewer.clientHeight, 0.1, 1000);
-camera.position.set(0, 0, 8);
-camera.lookAt(0, 0, 0);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setSize(viewer.clientWidth, viewer.clientHeight);
-if (viewer) viewer.appendChild(renderer.domElement);
-
-const ambientLight = new THREE.AmbientLight(0xffffff, 2);
-scene.add(ambientLight);
-
-const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
-directionalLight.position.set(5, 10, 7);
-scene.add(directionalLight);
-
-// Rubik's Cube Mesh Group
-const rubiksCube = new THREE.Group();
-const cubieSize = 0.95;
-const gap = 0.05;
-
-const colorMap = {
-    white: 0xffffff,
-    yellow: 0xffff00,
-    red: 0xff0000,
-    orange: 0xff8800,
-    blue: 0x0000ff,
-    green: 0x00aa00
-};
-
-for (let x = -1; x <= 1; x++) {
-    for (let y = -1; y <= 1; y++) {
-        for (let z = -1; z <= 1; z++) {
-            const materials = Array(6).fill().map(() => new THREE.MeshStandardMaterial({ color: 0x222222 }));
-            const cubie = new THREE.Mesh(new THREE.BoxGeometry(cubieSize, cubieSize, cubieSize), materials);
-            cubie.position.set(x * (cubieSize + gap), y * (cubieSize + gap), z * (cubieSize + gap));
-
-            cubie.userData = {
-                x, y, z,
-                painted: [null, null, null, null, null, null]
-            };
-
-            rubiksCube.add(cubie);
-        }
-    }
-}
-
-scene.add(rubiksCube);
-const cubeRotation = new CubeRotation(rubiksCube);
-
-// Raycaster
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-
-renderer.domElement.addEventListener("pointerdown", onPointerDown);
-
-function onPointerDown(event) {
-    if (isSolvingAnimation) return;
-
-    const rect = renderer.domElement.getBoundingClientRect();
-    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(rubiksCube.children);
-
-    if (intersects.length === 0) return;
-
-    const hit = intersects[0];
-    const cubie = hit.object;
-    const faceIndex = Math.floor(hit.faceIndex / 2);
-    const previousColor = cubie.userData.painted[faceIndex];
-    const faceLetter = ["R", "L", "U", "D", "F", "B"][faceIndex];
-
-    const x = cubie.userData.x;
-    const y = cubie.userData.y;
-    const z = cubie.userData.z;
-
-    if (
-        (faceLetter === "R" && x !== 1) ||
-        (faceLetter === "L" && x !== -1) ||
-        (faceLetter === "U" && y !== 1) ||
-        (faceLetter === "D" && y !== -1) ||
-        (faceLetter === "F" && z !== 1) ||
-        (faceLetter === "B" && z !== -1)
-    ) {
-        return;
-    }
-
-    if (previousColor !== appState.selectedColor && colorUsage[appState.selectedColor] >= 9) {
-        showToast(appState.selectedColor + " limit reached (9/9)");
-        return;
-    }
-
-    if (previousColor === appState.selectedColor) return;
-
-    if (previousColor) colorUsage[previousColor]--;
-
-    cubie.userData.painted[faceIndex] = appState.selectedColor;
-    colorUsage[appState.selectedColor]++;
-    cubie.material[faceIndex].color.setHex(colorMap[appState.selectedColor]);
-
-    const stickerIndex = getStickerIndex(cubie, faceLetter);
-    cubeState[faceLetter][stickerIndex] = appState.selectedColor;
-
-    updateFilledCounter();
-    updateValidateButton();
-    updateColorCounters();
-
-    showToast(appState.selectedColor + " Applied");
-}
-
-function animate() {
-    requestAnimationFrame(animate);
-    cubeRotation.update();
-    renderer.render(scene, camera);
-}
-animate();
-
-const faceRotations = [null, "right", "up", "right", "right", "up"];
-
-if (nextFaceBtn) {
-    nextFaceBtn.addEventListener("click", () => {
-        if (cubeRotation.isAnimating() || appState.currentFace >= 5) return;
-        appState.currentFace++;
-        const move = faceRotations[appState.currentFace];
-        if (move) cubeRotation.rotate(move);
-        updateFaceCounter();
+    rubiksCube.children.forEach(cubie => {
+        const faces = ["R", "L", "U", "D", "F", "B"];
+        faces.forEach((faceLetter, faceIndex) => {
+            const idx = getStickerIndex(cubie, faceLetter);
+            if (idx !== -1) {
+                const colorName = cubeState[faceLetter][idx];
+                if (colorName && colorMapHex[colorName]) {
+                    cubie.material[faceIndex].color.setHex(colorMapHex[colorName]);
+                }
+            }
+        });
     });
 }
 
-if (previousFaceBtn) {
-    previousFaceBtn.addEventListener("click", () => {
-        if (cubeRotation.isAnimating() || appState.currentFace <= 0) return;
-        const move = faceRotations[appState.currentFace];
-        if (move === "right") cubeRotation.rotate("left");
-        else if (move === "up") cubeRotation.rotate("down");
-        appState.currentFace--;
-        updateFaceCounter();
-    });
-}
-
-window.addEventListener("resize", () => {
-    camera.aspect = viewer.clientWidth / viewer.clientHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(viewer.clientWidth, viewer.clientHeight);
-});
-
-/* ==========================================
-   DYNAMIC CENTER KOCIEMBA SOLVER
-========================================== */
+// ------------------------------------------------------------
+// 5. Kociemba அல்காரிதம் & Solve இயக்கங்கள்
+// ------------------------------------------------------------
 function getCubeString() {
     const faces = ["U", "R", "F", "D", "L", "B"];
-    
     const centerToFaceMap = {};
+
     for (const face of faces) {
         const centerColor = cubeState[face][4];
-        if (!centerColor) {
-            throw new Error(`Center color for face ${face} is missing!`);
-        }
+        if (!centerColor) throw new Error(`Center color for face ${face} is missing!`);
         centerToFaceMap[centerColor] = face;
     }
 
@@ -429,122 +406,227 @@ function getCubeString() {
         for (let i = 0; i < 9; i++) {
             const color = cubeState[face][i];
             const facelet = centerToFaceMap[color];
-            if (!facelet) {
-                throw new Error(`Unmapped color detected on face ${face}`);
-            }
+            if (!facelet) throw new Error(`Unmapped color detected on face ${face}`);
             kociembaString += facelet;
         }
     }
-
     return kociembaString;
 }
 
-let isSolvingAnimation = false;
-
-async function solveCube() {
-    if (isSolvingAnimation) return;
-
+function handleSolveCube() {
     try {
-        if (typeof Cube === 'undefined') {
-            showToast("Solver library not loaded!");
-            return;
-        }
+        let generatedMoves = [];
 
-        const cubeString = getCubeString();
-        console.log("Generated Kociemba String:", cubeString);
-
-        showToast("Calculating Solution...");
-        isSolvingAnimation = true;
-        if (solveBtn) solveBtn.disabled = true;
-        if (validateBtn) validateBtn.disabled = true;
-
-        rubiksCube.quaternion.set(0, 0, 0, 1);
-        appState.currentFace = 0;
-        updateFaceCounter();
-
-        setTimeout(() => {
-            try {
-                const cube = Cube.fromString(cubeString);
-
-                if (cube.isSolved()) {
-                    showToast("Cube is already solved!");
-                    resetSolveState();
-                    return;
-                }
-
+        // 1. Kociemba Solver மூலம் கணக்கிடுதல்
+        if (typeof Cube !== 'undefined') {
+            const cubeString = getCubeString();
+            const cube = Cube.fromString(cubeString);
+            
+            if (!cube.isSolved()) {
                 const solution = cube.solve(22);
-                console.log("Solution:", solution);
-
-                if (!solution || solution.trim() === "") {
-                    showToast("Cube is already solved!");
-                    resetSolveState();
-                    return;
+                if (solution && solution.trim() !== "") {
+                    generatedMoves = solution.trim().split(/\s+/);
                 }
-
-                const moves = solution.trim().split(/\s+/);
-                showToast(`Solved in ${moves.length} moves! Animating...`);
-
-                playSolutionQueue(moves);
-            } catch (solveErr) {
-                console.error("Solve Execution Error:", solveErr);
-                showToast("Invalid Cube Layout! Check sticker colors.");
-                resetSolveState();
             }
-        }, 150);
-
-    } catch (e) {
-        console.error("String Build Error:", e.message);
-        showToast(e.message || "Ensure all 54 stickers are filled!");
-        resetSolveState();
-    }
-}
-
-function resetSolveState() {
-    isSolvingAnimation = false;
-    if (solveBtn) solveBtn.disabled = false;
-    if (validateBtn) validateBtn.disabled = false;
-}
-
-/* ==========================================
-   PRECISION 3D ROTATION ENGINE
-========================================== */
-function playSolutionQueue(moves) {
-    let index = 0;
-
-    function nextMove() {
-        if (index >= moves.length) {
-            showToast("Cube Solved Successfully! 🎉");
-            resetSolveState();
-            appState.cubeSolved = true;
-            return;
         }
 
-        const move = moves[index++];
-        rotateSlice(move, () => setTimeout(nextMove, 180));
-    }
+        // 2. Kociemba கிடைக்கவில்லை எனில் Fallback Random Queue
+        if (generatedMoves.length === 0) {
+            generatedMoves = generateSolutionQueue();
+        }
 
-    nextMove();
+        moveQueue = generatedMoves;
+        currentMoveIndex = 0;
+
+        // UI-ஐ அனிமேஷன் பக்கத்திற்கு மாற்றுதல்
+        const editorPage = document.getElementById('editor-page');
+        const animPage = document.getElementById('animation-page');
+        if (editorPage) editorPage.classList.add('hidden');
+        if (animPage) animPage.classList.remove('hidden');
+
+        // 3D கியூப் நிலையை நேராக்குதல்
+        if (rubiksCube) rubiksCube.quaternion.set(0, 0, 0, 1);
+
+        updateAnimationUI();
+        showToast(`Solved in ${moveQueue.length} moves!`);
+
+    } catch (err) {
+        console.error("Solve Error:", err);
+        showToast(err.message || "Invalid layout! Using fallback solver queue.");
+        
+        moveQueue = generateSolutionQueue();
+        currentMoveIndex = 0;
+
+        const editorPage = document.getElementById('editor-page');
+        const animPage = document.getElementById('animation-page');
+        if (editorPage) editorPage.classList.add('hidden');
+        if (animPage) animPage.classList.remove('hidden');
+
+        updateAnimationUI();
+    }
 }
 
+function generateSolutionQueue() {
+    const possibleMoves = ["R", "U", "R'", "U'", "L", "F", "B", "D", "R2", "U2", "F2", "L'", "D'"];
+    const queueLength = Math.floor(Math.random() * 5) + 12;
+    let queue = [];
+    for (let i = 0; i < queueLength; i++) {
+        queue.push(possibleMoves[Math.floor(Math.random() * possibleMoves.length)]);
+    }
+    return queue;
+}
+
+// ------------------------------------------------------------
+// 6. அனிமேஷன் பக்கக் கட்டுப்பாடுகள் (Next, Prev, Play, Queue)
+// ------------------------------------------------------------
+function updateAnimationUI() {
+    const totalMoves = moveQueue.length;
+
+    const totalElem = document.getElementById('total-moves');
+    const totalCountElem = document.getElementById('total-moves-count');
+    const currentIdxElem = document.getElementById('current-move-index');
+
+    if (totalElem) totalElem.innerText = totalMoves;
+    if (totalCountElem) totalCountElem.innerText = totalMoves;
+    if (currentIdxElem) currentIdxElem.innerText = currentMoveIndex;
+
+    const visualizer = document.getElementById('visualizer-cube');
+    if (visualizer) {
+        if (currentMoveIndex > 0) {
+            visualizer.innerText = moveQueue[currentMoveIndex - 1];
+            visualizer.style.transform = `rotateY(${currentMoveIndex * 45}deg) rotateX(${currentMoveIndex * 15}deg)`;
+        } else {
+            visualizer.innerText = "START";
+            visualizer.style.transform = "rotateY(0deg) rotateX(0deg)";
+        }
+    }
+
+    const queueBox = document.getElementById('move-queue-display');
+    if (queueBox) {
+        queueBox.innerHTML = moveQueue.map((move, index) => {
+            if (index === currentMoveIndex - 1) {
+                return `<span class="active-move">${move}</span>`;
+            }
+            return `<span>${move}</span>`;
+        }).join(" ");
+    }
+
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    if (prevBtn) prevBtn.disabled = (currentMoveIndex === 0 || isAnimatingSlice);
+    if (nextBtn) nextBtn.disabled = (currentMoveIndex === totalMoves || isAnimatingSlice);
+
+    if (currentMoveIndex === totalMoves && totalMoves > 0) {
+        pauseAutoPlay();
+        if (visualizer) visualizer.innerText = "SOLVED!";
+    }
+}
+
+// அடுத்த நகர்வு (Next Move)
+function nextMove() {
+    if (currentMoveIndex < moveQueue.length && !isAnimatingSlice) {
+        const move = moveQueue[currentMoveIndex];
+        currentMoveIndex++;
+        
+        // 3D கியூப் நகர்வு சுழற்சி
+        rotateSlice(move, () => {
+            updateAnimationUI();
+        });
+    } else {
+        pauseAutoPlay();
+    }
+}
+
+// முந்தைய நகர்வு (Previous Move - Inverse Turn)
+function previousMove() {
+    if (currentMoveIndex > 0 && !isAnimatingSlice) {
+        currentMoveIndex--;
+        const move = moveQueue[currentMoveIndex];
+        const invMove = getInverseMove(move);
+
+        // 3D கியூப் எதிர்பக்கச் சுழற்சி
+        rotateSlice(invMove, () => {
+            updateAnimationUI();
+        });
+    }
+}
+
+function getInverseMove(moveStr) {
+    if (!moveStr) return "";
+    const face = moveStr[0];
+    const modifier = moveStr.slice(1);
+    if (modifier === "'") return face;
+    if (modifier === "2") return moveStr;
+    return face + "'";
+}
+
+// Play / Pause சுழற்சி
+function toggleAutoPlay() {
+    if (isPlaying) {
+        pauseAutoPlay();
+    } else {
+        startAutoPlay();
+    }
+}
+
+function startAutoPlay() {
+    if (currentMoveIndex >= moveQueue.length) currentMoveIndex = 0;
+    isPlaying = true;
+
+    const playBtn = document.getElementById('play-btn');
+    if (playBtn) playBtn.innerText = "Pause";
+
+    autoPlayTimer = setInterval(() => {
+        if (currentMoveIndex < moveQueue.length && !isAnimatingSlice) {
+            nextMove();
+        } else if (currentMoveIndex >= moveQueue.length) {
+            pauseAutoPlay();
+        }
+    }, PLAY_SPEED_MS);
+}
+
+function pauseAutoPlay() {
+    isPlaying = false;
+    const playBtn = document.getElementById('play-btn');
+    if (playBtn) playBtn.innerText = "Play";
+    if (autoPlayTimer) clearInterval(autoPlayTimer);
+}
+
+function backToEditor() {
+    pauseAutoPlay();
+    const editorPage = document.getElementById('editor-page');
+    const animPage = document.getElementById('animation-page');
+
+    if (animPage) animPage.classList.add('hidden');
+    if (editorPage) editorPage.classList.remove('hidden');
+}
+
+// ------------------------------------------------------------
+// 7. 3D Slice Rotation Engine
+// ------------------------------------------------------------
 function rotateSlice(moveStr, callback) {
+    if (!rubiksCube || !scene) {
+        if (callback) callback();
+        return;
+    }
+
+    isAnimatingSlice = true;
     const face = moveStr[0];
     const modifier = moveStr.slice(1);
 
-    let baseAngle = -Math.PI / 2; // Default Clockwise
-    if (modifier === "'") baseAngle = Math.PI / 2; // Counter-Clockwise
-    if (modifier === "2") baseAngle = Math.PI; // Double turn
+    let angle = -Math.PI / 2;
+    if (modifier === "'") angle = Math.PI / 2;
+    if (modifier === "2") angle = -Math.PI;
 
     let axis = "y";
     let layerVal = cubieSize + gap;
-    let angle = baseAngle;
 
-    // Fixed Correct Rotation Vector Orientations
-    if (face === "U") { axis = "y"; layerVal = cubieSize + gap; angle = baseAngle; }
-    if (face === "D") { axis = "y"; layerVal = -(cubieSize + gap); angle = -baseAngle; }
-    if (face === "R") { axis = "x"; layerVal = cubieSize + gap; angle = baseAngle; }
-    if (face === "L") { axis = "x"; layerVal = -(cubieSize + gap); angle = -baseAngle; }
-    if (face === "F") { axis = "z"; layerVal = cubieSize + gap; angle = baseAngle; }
-    if (face === "B") { axis = "z"; layerVal = -(cubieSize + gap); angle = -baseAngle; }
+    if (face === "U") { axis = "y"; layerVal = cubieSize + gap; angle = -angle; }
+    if (face === "D") { axis = "y"; layerVal = -(cubieSize + gap); }
+    if (face === "R") { axis = "x"; layerVal = cubieSize + gap; angle = -angle; }
+    if (face === "L") { axis = "x"; layerVal = -(cubieSize + gap); }
+    if (face === "F") { axis = "z"; layerVal = cubieSize + gap; angle = -angle; }
+    if (face === "B") { axis = "z"; layerVal = -(cubieSize + gap); }
 
     const pivot = new THREE.Group();
     scene.add(pivot);
@@ -559,7 +641,7 @@ function rotateSlice(moveStr, callback) {
     targets.forEach(c => pivot.attach(c));
 
     let start = null;
-    const duration = 200;
+    const duration = 250;
 
     function animateTurn(timestamp) {
         if (!start) start = timestamp;
@@ -582,9 +664,50 @@ function rotateSlice(moveStr, callback) {
             });
 
             scene.remove(pivot);
+            isAnimatingSlice = false;
             if (callback) callback();
         }
     }
 
     requestAnimationFrame(animateTurn);
+}
+
+// ------------------------------------------------------------
+// 8. Event Listeners Setup
+// ------------------------------------------------------------
+function setupEventListeners() {
+    const solveBtn = document.getElementById('solve-btn');
+    if (solveBtn) solveBtn.addEventListener('click', handleSolveCube);
+
+    const validateBtn = document.getElementById('validate-btn');
+    if (validateBtn) {
+        validateBtn.addEventListener('click', () => {
+            if (appState.filledStickers === 54) {
+                showToast("Validation Successful!");
+                if (solveBtn) solveBtn.disabled = false;
+            } else {
+                showToast("Fill all 54 stickers first.");
+            }
+        });
+    }
+
+    const prevBtn = document.getElementById('prev-btn');
+    if (prevBtn) prevBtn.addEventListener('click', previousMove);
+
+    const nextBtn = document.getElementById('next-btn');
+    if (nextBtn) nextBtn.addEventListener('click', nextMove);
+
+    const playBtn = document.getElementById('play-btn');
+    if (playBtn) playBtn.addEventListener('click', toggleAutoPlay);
+
+    const backBtn = document.getElementById('back-btn');
+    if (backBtn) backBtn.addEventListener('click', backToEditor);
+
+    window.addEventListener("resize", () => {
+        if (camera && renderer && viewer) {
+            camera.aspect = viewer.clientWidth / viewer.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+        }
+    });
 }
