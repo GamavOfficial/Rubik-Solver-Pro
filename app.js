@@ -3,7 +3,7 @@ import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
 /* ==========================================
-   Rubik Solver Pro - Final Fixed Core Engine
+   Rubik Solver Pro - Final Verified Code
 ========================================== */
 
 // Kociemba Initialization
@@ -89,7 +89,7 @@ function applyTheme(theme) {
     if (themeBtn) themeBtn.textContent = theme === "dark" ? "🌙" : "☀️";
 }
 
-// Color Picker
+// Color Picker Setup
 const colorButtons = document.querySelectorAll(".color-btn");
 
 const colorCounters = {
@@ -136,7 +136,7 @@ function updateColorCounters() {
     });
 }
 
-// Cube State Data
+// Cube State Data Structure
 const cubeState = {
     U: Array(9).fill(null),
     R: Array(9).fill(null),
@@ -234,7 +234,7 @@ refreshEditor();
 if (solveBtn) solveBtn.disabled = true;
 
 /* ==========================================
-   Precision 3D Sticker Indexing
+   Sticker Indexing Logic
 ========================================== */
 function getStickerIndex(cubie, faceLetter) {
     const x = cubie.userData.x;
@@ -246,8 +246,8 @@ function getStickerIndex(cubie, faceLetter) {
         case "D": return (1 - z) * 3 + (x + 1);
         case "F": return (1 - y) * 3 + (x + 1);
         case "B": return (1 - y) * 3 + (1 - x);
-        case "R": return (1 - y) * 3 + (1 - z);
-        case "L": return (1 - y) * 3 + (z + 1);
+        case "R": return (1 - y) * 3 + (z + 1);
+        case "L": return (1 - y) * 3 + (1 - z);
         default: return -1;
     }
 }
@@ -307,7 +307,7 @@ for (let x = -1; x <= 1; x++) {
 scene.add(rubiksCube);
 const cubeRotation = new CubeRotation(rubiksCube);
 
-// Raycaster Click Handler
+// Raycaster
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
@@ -360,8 +360,6 @@ function onPointerDown(event) {
     cubie.material[faceIndex].color.setHex(colorMap[appState.selectedColor]);
 
     const stickerIndex = getStickerIndex(cubie, faceLetter);
-    
-    // Store exact color name
     cubeState[faceLetter][stickerIndex] = appState.selectedColor;
 
     updateFilledCounter();
@@ -408,15 +406,14 @@ window.addEventListener("resize", () => {
 });
 
 /* ==========================================
-   DYNAMIC CENTER KOCIEMBA CONVERTER
+   DYNAMIC CENTER KOCIEMBA SOLVER
 ========================================== */
 function getCubeString() {
     const faces = ["U", "R", "F", "D", "L", "B"];
     
-    // Dynamic Center Color Map Construction
     const centerToFaceMap = {};
     for (const face of faces) {
-        const centerColor = cubeState[face][4]; // Index 4 is center piece
+        const centerColor = cubeState[face][4];
         if (!centerColor) {
             throw new Error(`Center color for face ${face} is missing!`);
         }
@@ -461,12 +458,10 @@ async function solveCube() {
         if (solveBtn) solveBtn.disabled = true;
         if (validateBtn) validateBtn.disabled = true;
 
-        // Reset View Orientation before starting animation
         rubiksCube.quaternion.set(0, 0, 0, 1);
         appState.currentFace = 0;
         updateFaceCounter();
 
-        // Non-blocking asynchronous calculation delay
         setTimeout(() => {
             try {
                 const cube = Cube.fromString(cubeString);
@@ -477,7 +472,6 @@ async function solveCube() {
                     return;
                 }
 
-                // Solve with max 22 moves search depth
                 const solution = cube.solve(22);
                 console.log("Solution:", solution);
 
@@ -493,7 +487,7 @@ async function solveCube() {
                 playSolutionQueue(moves);
             } catch (solveErr) {
                 console.error("Solve Execution Error:", solveErr);
-                showToast("Invalid Cube Layout! Please check sticker colors.");
+                showToast("Invalid Cube Layout! Check sticker colors.");
                 resetSolveState();
             }
         }, 150);
@@ -512,7 +506,7 @@ function resetSolveState() {
 }
 
 /* ==========================================
-   3D SLICE ROTATION ENGINE
+   PRECISION 3D ROTATION ENGINE
 ========================================== */
 function playSolutionQueue(moves) {
     let index = 0;
@@ -536,19 +530,21 @@ function rotateSlice(moveStr, callback) {
     const face = moveStr[0];
     const modifier = moveStr.slice(1);
 
-    let angle = -Math.PI / 2;
-    if (modifier === "'") angle = Math.PI / 2;
-    if (modifier === "2") angle = -Math.PI;
+    let baseAngle = -Math.PI / 2; // Default Clockwise
+    if (modifier === "'") baseAngle = Math.PI / 2; // Counter-Clockwise
+    if (modifier === "2") baseAngle = Math.PI; // Double turn
 
     let axis = "y";
     let layerVal = cubieSize + gap;
+    let angle = baseAngle;
 
-    if (face === "U") { axis = "y"; layerVal = cubieSize + gap; angle = -angle; }
-    if (face === "D") { axis = "y"; layerVal = -(cubieSize + gap); }
-    if (face === "R") { axis = "x"; layerVal = cubieSize + gap; angle = -angle; }
-    if (face === "L") { axis = "x"; layerVal = -(cubieSize + gap); }
-    if (face === "F") { axis = "z"; layerVal = cubieSize + gap; angle = -angle; }
-    if (face === "B") { axis = "z"; layerVal = -(cubieSize + gap); }
+    // Fixed Correct Rotation Vector Orientations
+    if (face === "U") { axis = "y"; layerVal = cubieSize + gap; angle = baseAngle; }
+    if (face === "D") { axis = "y"; layerVal = -(cubieSize + gap); angle = -baseAngle; }
+    if (face === "R") { axis = "x"; layerVal = cubieSize + gap; angle = baseAngle; }
+    if (face === "L") { axis = "x"; layerVal = -(cubieSize + gap); angle = -baseAngle; }
+    if (face === "F") { axis = "z"; layerVal = cubieSize + gap; angle = baseAngle; }
+    if (face === "B") { axis = "z"; layerVal = -(cubieSize + gap); angle = -baseAngle; }
 
     const pivot = new THREE.Group();
     scene.add(pivot);
