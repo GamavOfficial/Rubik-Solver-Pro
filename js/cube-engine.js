@@ -1,18 +1,11 @@
 /**
-
 ==========================================================
-
 Rubik Solver Pro
-
 cube-engine.js
-
-Part 1 - Engine Foundation & Scene Initialization
-
+Part 1 to 5 - Complete Engine Implementation
 Three.js r179+
-
 ==========================================================
 */
-
 
 import * as THREE from "three";
 
@@ -143,56 +136,44 @@ constructor(options = {}) {
     this.turnSpeed = this.speed.fast;  
     
     // --------------------------------------------------
-// Rotation Configuration
-// --------------------------------------------------
+    // Rotation Configuration
+    // --------------------------------------------------
+    this.faceAxis = {
+        U: "y", D: "y",
+        L: "x", R: "x",
+        F: "z", B: "z"
+    };
 
-this.faceAxis = {
-    U: "y",
-    D: "y",
-    L: "x",
-    R: "x",
-    F: "z",
-    B: "z"
-};
+    this.faceLayer = {
+        U: 1, D: -1,
+        L: -1, R: 1,
+        F: 1, B: -1
+    };
 
-this.faceLayer = {
-    U: 1,
-    D: -1,
-    L: -1,
-    R: 1,
-    F: 1,
-    B: -1
-};
+    this.faceDirection = {
+        U: 1, D: -1,
+        L: -1, R: 1,
+        F: 1, B: -1
+    };
 
-this.faceDirection = {
-    U: 1,
-    D: -1,
-    L: -1,
-    R: 1,
-    F: 1,
-    B: -1
-};
+    this.activeColor = null;
 
-this.activeColor = null;
-
-this.colorToFaceLetter = {
-    "U": "U",
-    "R": "R",
-    "F": "F",
-    "D": "D",
-    "L": "L",
-    "B": "B"
-};
+    this.colorToFaceLetter = {
+        "white": "U", "U": "U",
+        "yellow": "D", "D": "D",
+        "orange": "L", "L": "L",
+        "red": "R", "R": "R",
+        "green": "F", "F": "F",
+        "blue": "B", "B": "B"
+    };
 
     // --------------------------------------------------  
     // Execution Performance Bindings  
     // --------------------------------------------------  
-
     this.resizeHandler = this.onResize.bind(this);  
-    
     this.pointerDownHandler = this.onPointerDown.bind(this);
-this.pointerMoveHandler = this.onPointerMove.bind(this);
-this.pointerUpHandler = this.onPointerUp.bind(this);
+    this.pointerMoveHandler = this.onPointerMove.bind(this);
+    this.pointerUpHandler = this.onPointerUp.bind(this);
 
     // Options Override Custom Configurations  
     Object.assign(this, options);  
@@ -210,15 +191,9 @@ initialize(container) {
 
     this.container = container;  
 
-    // -----------------------------------------  
-    // Scene Creation  
-    // -----------------------------------------  
     this.scene = new THREE.Scene();  
     this.scene.background = null;  
 
-    // -----------------------------------------  
-    // Camera Precision Setup  
-    // -----------------------------------------  
     const width = container.clientWidth;  
     const height = container.clientHeight;  
 
@@ -226,9 +201,6 @@ initialize(container) {
     this.camera.position.set(6.5, 5.5, 7.5);  
     this.camera.lookAt(0, 0, 0);  
 
-    // -----------------------------------------  
-    // Production Graphics Renderer  
-    // -----------------------------------------  
     this.renderer = new THREE.WebGLRenderer({  
         antialias: true,  
         alpha: true,  
@@ -246,46 +218,31 @@ initialize(container) {
     this.canvas = this.renderer.domElement;  
     container.appendChild(this.canvas);  
 
-    // -----------------------------------------  
-    // Hierarchy Root Anchors  
-    // -----------------------------------------  
     this.world = new THREE.Group();  
     this.scene.add(this.world);  
 
     this.cubeRoot = new THREE.Group();  
     this.world.add(this.cubeRoot);  
 
-    // -----------------------------------------  
-    // Subsystem Component Triggers  
-    // -----------------------------------------  
     this.createLights();  
 
     if (typeof this.buildCube === "function") {  
         this.buildCube();  
     }  
 
-    // -----------------------------------------  
-    // Event Listeners Registration  
-    // -----------------------------------------  
     window.addEventListener("resize", this.resizeHandler);  
+    this.canvas.addEventListener("pointerdown", this.pointerDownHandler);
+    this.canvas.addEventListener("pointermove", this.pointerMoveHandler);
+    this.canvas.addEventListener("pointerup", this.pointerUpHandler);
 
-this.canvas.addEventListener("pointerdown", this.pointerDownHandler);
-this.canvas.addEventListener("pointermove", this.pointerMoveHandler);
-this.canvas.addEventListener("pointerup", this.pointerUpHandler);
-
-    // -----------------------------------------  
-    // Execution Lifecycle Start  
-    // -----------------------------------------  
     this.clock.start();  
     this.animate();  
 }  
 
 createLights() {  
-    // Ambient Light Subsystem  
     this.ambientLight = new THREE.AmbientLight(0xffffff, 0.45);  
     this.scene.add(this.ambientLight);  
 
-    // Directional Primary Sunlight Vector  
     this.directionLight = new THREE.DirectionalLight(0xffffff, 1.25);  
     this.directionLight.position.set(5, 8, 6);  
     this.directionLight.castShadow = true;  
@@ -295,7 +252,6 @@ createLights() {
     this.directionLight.shadow.camera.far = 30;  
     this.scene.add(this.directionLight);  
 
-    // Soft Secondary Chromatic Point Light  
     this.fillLight = new THREE.PointLight(0x66aaff, 0.35);  
     this.fillLight.position.set(-6, 4, -5);  
     this.scene.add(this.fillLight);  
@@ -357,9 +313,9 @@ dispose() {
     cancelAnimationFrame(this.animationId);  
     window.removeEventListener("resize", this.resizeHandler);  
     
-    this.canvas?.removeEventListener("pointerdown", this.onPointerDown);
-this.canvas?.removeEventListener("pointermove", this.onPointerMove);
-this.canvas?.removeEventListener("pointerup", this.onPointerUp);
+    this.canvas?.removeEventListener("pointerdown", this.pointerDownHandler);
+    this.canvas?.removeEventListener("pointermove", this.pointerMoveHandler);
+    this.canvas?.removeEventListener("pointerup", this.pointerUpHandler);
 
     if (this.renderer) {  
         this.renderer.dispose();  
@@ -389,8 +345,6 @@ createSharedGeometry() {
     );  
 
     this.edgeGeometry = new THREE.EdgesGeometry(this.bodyGeometry);  
-      
-    // செயல்திறனை அதிகரிக்க ஸ்டிக்கர் ஜியோமெட்ரியை இங்கே கேச் செய்கிறோம்  
     this.stickerGeometry = new THREE.PlaneGeometry(  
         this.size.sticker,  
         this.size.sticker  
@@ -408,7 +362,6 @@ createSharedMaterials() {
         color: this.colors.EDGE  
     });  
 
-    // ஒவ்வொரு பக்கத்திற்கும் தேவையான மெட்டீரியல்களை கேச் செய்து மெமரியைச் சேமிக்கிறோம்  
     this.stickerMaterials = {};  
     const faces = ["U", "D", "L", "R", "F", "B"];  
       
@@ -433,7 +386,6 @@ buildCube() {
 
     const gap = this.size.gap;  
 
-    // 3x3x3 பரிமாணங்களில் கியூப் கட்டமைப்பு உருவாக்கம்  
     for (let x = -1; x <= 1; x++) {  
         for (let y = -1; y <= 1; y++) {  
             for (let z = -1; z <= 1; z++) {  
@@ -469,12 +421,7 @@ createCubie(x, y, z) {
     );  
     mesh.add(edges);  
 
-    this.attachStickers(  
-        mesh,  
-        x,  
-        y,  
-        z  
-    );  
+    this.attachStickers(mesh, x, y, z);  
 
     return mesh;  
 }  
@@ -496,82 +443,26 @@ attachStickers(mesh, x, y, z) {
     const offset = this.size.cubie / 2 + this.size.stickerOffset;  
 
     if (x === 1) {  
-        this.addSticker(  
-            mesh,  
-            "R",  
-            this.colors.R,  
-            new THREE.Vector3(offset, 0, 0),  
-            new THREE.Euler(0, -Math.PI / 2, 0),  
-            x, y, z  
-        );  
+        this.addSticker(mesh, "R", this.colors.R, new THREE.Vector3(offset, 0, 0), new THREE.Euler(0, -Math.PI / 2, 0), x, y, z);  
     }  
-
     if (x === -1) {  
-        this.addSticker(  
-            mesh,  
-            "L",  
-            this.colors.L,  
-            new THREE.Vector3(-offset, 0, 0),  
-            new THREE.Euler(0, Math.PI / 2, 0),  
-            x, y, z  
-        );  
+        this.addSticker(mesh, "L", this.colors.L, new THREE.Vector3(-offset, 0, 0), new THREE.Euler(0, Math.PI / 2, 0), x, y, z);  
     }  
-
     if (y === 1) {  
-        this.addSticker(  
-            mesh,  
-            "U",  
-            this.colors.U,  
-            new THREE.Vector3(0, offset, 0),  
-            new THREE.Euler(-Math.PI / 2, 0, 0),  
-            x, y, z  
-        );  
+        this.addSticker(mesh, "U", this.colors.U, new THREE.Vector3(0, offset, 0), new THREE.Euler(-Math.PI / 2, 0, 0), x, y, z);  
     }  
-
     if (y === -1) {  
-        this.addSticker(  
-            mesh,  
-            "D",  
-            this.colors.D,  
-            new THREE.Vector3(0, -offset, 0),  
-            new THREE.Euler(Math.PI / 2, 0, 0),  
-            x, y, z  
-        );  
+        this.addSticker(mesh, "D", this.colors.D, new THREE.Vector3(0, -offset, 0), new THREE.Euler(Math.PI / 2, 0, 0), x, y, z);  
     }  
-
     if (z === 1) {  
-        this.addSticker(  
-            mesh,  
-            "F",  
-            this.colors.F,  
-            new THREE.Vector3(0, 0, offset),  
-            new THREE.Euler(),  
-            x, y, z  
-        );  
+        this.addSticker(mesh, "F", this.colors.F, new THREE.Vector3(0, 0, offset), new THREE.Euler(), x, y, z);  
     }  
-
     if (z === -1) {  
-        this.addSticker(  
-            mesh,  
-            "B",  
-            this.colors.B,  
-            new THREE.Vector3(0, 0, -offset),  
-            new THREE.Euler(0, Math.PI, 0),  
-            x, y, z  
-        );  
+        this.addSticker(mesh, "B", this.colors.B, new THREE.Vector3(0, 0, -offset), new THREE.Euler(0, Math.PI, 0), x, y, z);  
     }  
 }  
 
-addSticker(  
-    parent,  
-    face,  
-    color,  
-    position,  
-    rotation,  
-    gx,  
-    gy,  
-    gz  
-) {  
+addSticker(parent, face, color, position, rotation, gx, gy, gz) {  
     const sticker = new THREE.Mesh(  
         this.createStickerGeometry(),  
         this.createStickerMaterial(face)  
@@ -584,11 +475,7 @@ addSticker(
         initialFace: face,  
         currentFace: face,  
         color: face,  
-        grid: {  
-            x: gx,  
-            y: gy,  
-            z: gz  
-        },  
+        grid: { x: gx, y: gy, z: gz },  
         isCenter: Math.abs(gx) + Math.abs(gy) + Math.abs(gz) === 1  
     };  
 
@@ -598,7 +485,7 @@ addSticker(
 
 // =====================================================  
 // Part 3  
-// Rotation Engine Implementation (Revised)  
+// Rotation Engine Implementation  
 // =====================================================  
 
 enqueue(move) {  
@@ -629,7 +516,6 @@ parseMove(moveStr) {
     const face = match[1];  
     const modifier = match[2];  
 
-    // என்ஜினில் ஏற்கனவே உள்ள கட்டமைப்புகளை நேரடியாகப் பயன்படுத்துகிறது  
     const axis = this.faceAxis[face];  
     const layer = this.faceLayer[face];  
     const direction = this.faceDirection[face];  
@@ -665,7 +551,7 @@ applyAlgorithm(algStr) {
 getLayerCubies(axis, layer) {  
     const gap = this.size.gap;  
     const expectedPos = layer * gap;  
-    const epsilon = 0.001; // உயர்தர மிதவைப்புள்ளி சகிப்புத்தன்மை எல்லை  
+    const epsilon = 0.001;  
 
     return this.cubies.filter(cubie => {  
         return Math.abs(cubie.position[axis] - expectedPos) < epsilon;  
@@ -702,7 +588,6 @@ endMove() {
 
     const targets = [...this.rotationGroup.children];  
     const gap = this.size.gap;  
-    const positionEpsilon = 0.001;  
     const vectorEpsilon = 0.9;  
 
     const targetQuaternion = new THREE.Quaternion();  
@@ -714,12 +599,10 @@ endMove() {
     targets.forEach(cubie => {  
         this.cubeRoot.attach(cubie);  
 
-        // 1. கியூப் துண்டின் நிலையை துல்லியமாக ஸ்னாப் செய்கிறது (Position Snapping)  
         cubie.position.x = Math.round(cubie.position.x / gap) * gap;  
         cubie.position.y = Math.round(cubie.position.y / gap) * gap;  
         cubie.position.z = Math.round(cubie.position.z / gap) * gap;  
 
-        // 2. கியூப் துண்டின் சுழற்சியை துல்லியமாக ஸ்னாப் செய்கிறது (Rotation Snapping)  
         rotationMatrix.makeRotationFromQuaternion(cubie.quaternion);  
         rotationMatrix.extractBasis(xAxis, yAxis, zAxis);  
 
@@ -731,15 +614,12 @@ endMove() {
         cubie.quaternion.setFromRotationMatrix(rotationMatrix);  
         cubie.rotation.setFromQuaternion(cubie.quaternion);  
 
-        // 3. கியூப் கட்டக் கூறுகளை புதுப்பிக்கிறது  
         cubie.userData.grid.x = Math.round(cubie.position.x / gap);  
         cubie.userData.grid.y = Math.round(cubie.position.y / gap);  
         cubie.userData.grid.z = Math.round(cubie.position.z / gap);  
 
-        // 4. ஸ்டிக்கர்களின் உலகளாவிய நோக்குநிலையை புதுப்பிக்கிறது  
         cubie.children.forEach(child => {  
             if (child.userData && child.userData.currentFace) {  
-                // உலகளாவிய குவாட்டர்னியனைப் பயன்படுத்துகிறது  
                 child.getWorldQuaternion(targetQuaternion);  
                   
                 const normal = new THREE.Vector3(0, 0, 1);  
@@ -772,134 +652,118 @@ endMove() {
 
 // =====================================================
 // Part 4
-// Raycasting & Interaction Engine (Color Input Version)
+// Raycasting & Interaction Engine
 // =====================================================
 
 onPointerDown(event) {
-if (this.isAnimating || this.isPaused || !this.canvas) return;
+    if (this.isAnimating || this.isPaused || !this.canvas) return;
 
-// தட்டல் துல்லியத்தை சரிபார்க்க தொடக்க புள்ளியை சேமிக்கிறது    
-this.pointerStart.x = event.clientX;    
-this.pointerStart.y = event.clientY;    
-this.dragging = false;
-
+    this.pointerStart.x = event.clientX;    
+    this.pointerStart.y = event.clientY;    
+    this.dragging = false;
 }
 
 onPointerMove(event) {
-// புதிய விதிகளின்படி கைமுறையாக இழுக்கும்போது கியூப் சுழலக் கூடாது
-this.pointerNow.x = event.clientX;
-this.pointerNow.y = event.clientY;
+    this.pointerNow.x = event.clientX;
+    this.pointerNow.y = event.clientY;
 }
 
 onPointerUp(event) {
-if (this.isAnimating || this.isPaused || !this.canvas) return;
+    if (this.isAnimating || this.isPaused || !this.canvas) return;
 
-const deltaX = event.clientX - this.pointerStart.x;    
-const deltaY = event.clientY - this.pointerStart.y;    
-const moveDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);    
+    const deltaX = event.clientX - this.pointerStart.x;    
+    const deltaY = event.clientY - this.pointerStart.y;    
+    const moveDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);    
 
-// நகர்வு தூரம் 5 பிக்சல்களுக்கு மேல் இருந்தால் அது தட்டலாக கருதப்படாது (Anti-jitter)    
-if (moveDistance > 5) {    
-    return;    
-}    
+    if (moveDistance > 5) return;    
 
-const rect = this.canvas.getBoundingClientRect();    
-this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;    
-this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;    
+    const rect = this.canvas.getBoundingClientRect();    
+    this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;    
+    this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;    
 
-this.raycaster.setFromCamera(this.mouse, this.camera);    
-const intersects = this.raycaster.intersectObjects(this.stickers);    
+    this.raycaster.setFromCamera(this.mouse, this.camera);    
+    const intersects = this.raycaster.intersectObjects(this.stickers);    
 
-if (intersects.length > 0) {    
-    const clickedSticker = intersects[0].object;    
-        
-    // app.js அல்லது பிற கோப்புகள் கையாளுவதற்கு ஏதுவாக கால்பேக் இருந்தால் இயக்குகிறது    
-    if (typeof this.onStickerTapped === "function") {    
-        this.onStickerTapped(clickedSticker);    
-    } else if (this.activeColor) {    
-        // என்ஜினில் செயலில் உள்ள வண்ணம் (activeColor) இருந்தால் நேரடியாகப் பயன்படுத்துகிறது    
-        this.setStickerColor(clickedSticker, this.activeColor);    
-    }    
-}
-
+    if (intersects.length > 0) {    
+        const clickedSticker = intersects[0].object;    
+            
+        if (typeof this.onStickerTapped === "function") {    
+            this.onStickerTapped(clickedSticker);    
+        } else if (this.activeColor) {    
+            this.setStickerColor(clickedSticker, this.activeColor);    
+        }    
+    }
 }
 
 setStickerColor(sticker, faceColor) {
-if (!sticker || !this.stickerMaterials || !this.stickerMaterials[faceColor]) return;
+    if (!sticker || !this.stickerMaterials || !this.stickerMaterials[faceColor]) return;
 
-// ஸ்டிக்கரின் காட்சி வண்ணத்தை (Material) மாற்றுகிறது    
-sticker.material = this.stickerMaterials[faceColor];    
-    
-// தர்க்க நிலையை (Logical State) புதுப்பிக்கிறது    
-sticker.userData.color = faceColor;    
+    sticker.material = this.stickerMaterials[faceColor];    
+    sticker.userData.color = faceColor;    
 
-// ஒட்டுமொத்த நிரல் பயன்பாட்டிற்கான நிகழ்வைத் தூண்டுகிறது    
-if (typeof this.onStateChanged === "function") {    
-    this.onStateChanged();    
-}
-
+    if (typeof this.onStateChanged === "function") {    
+        this.onStateChanged();    
+    }
 }
 
 navigateToFace(faceCode) {
-if (!this.world) return;
+    if (!this.world) return;
 
-// ஒவ்வொரு பக்கத்திற்கும் தேவையான துல்லியமான முப்பரிமாண கோணங்கள் (Isometric Perspective)    
-const targetRotations = {    
-    "F": { x: -0.35, y: 0.45 },    
-    "R": { x: -0.35, y: -1.10 },    
-    "B": { x: -0.35, y: -2.70 },    
-    "L": { x: -0.35, y: 1.95 },    
-    "U": { x: -1.20, y: 0.45 },    
-    "D": { x: 0.65, y: 0.45 }    
-};    
+    const targetRotations = {    
+        "F": { x: -0.35, y: 0.45 },    
+        "R": { x: -0.35, y: -1.10 },    
+        "B": { x: -0.35, y: -2.70 },    
+        "L": { x: -0.35, y: 1.95 },    
+        "U": { x: -1.20, y: 0.45 },    
+        "D": { x: 0.65, y: 0.45 }    
+    };    
 
-const target = targetRotations[faceCode.toUpperCase()];    
-if (!target) return;    
+    const target = targetRotations[faceCode.toUpperCase()];    
+    if (!target) return;    
 
-this.isAnimating = true;    
+    this.isAnimating = true;    
 
-const startX = this.world.rotation.x;    
-const startY = this.world.rotation.y;    
-    
-const startTime = performance.now();    
-const duration = 450; // சுழற்சி கால அளவு (மில்லி விநாடிகளில்)    
-
-const animateTransition = (now) => {    
-    const progress = Math.min((now - startTime) / duration, 1);    
+    const startX = this.world.rotation.x;    
+    const startY = this.world.rotation.y;    
         
-    // சீரான சுழற்சிக்கான Easing கணக்கீடு (Ease-out Quad)    
-    const ease = progress * (2 - progress);    
+    const startTime = performance.now();    
+    const duration = 450;    
 
-    this.world.rotation.x = startX + (target.x - startX) * ease;    
-    this.world.rotation.y = startY + (target.y - startY) * ease;    
+    const animateTransition = (now) => {    
+        const progress = Math.min((now - startTime) / duration, 1);    
+        const ease = progress * (2 - progress);    
 
-    if (progress < 1) {    
-        requestAnimationFrame(animateTransition);    
-    } else {    
-        // இறுதி நிலையை துல்லியமாக ஸ்னாப் செய்கிறது    
-        this.world.rotation.x = target.x;    
-        this.world.rotation.y = target.y;    
-            
-        this.cameraRotation.x = target.x;    
-        this.cameraRotation.y = target.y;    
-            
-        this.isAnimating = false;    
-    }    
-};    
+        this.world.rotation.x = startX + (target.x - startX) * ease;    
+        this.world.rotation.y = startY + (target.y - startY) * ease;    
 
-requestAnimationFrame(animateTransition);
+        if (progress < 1) {    
+            requestAnimationFrame(animateTransition);    
+        } else {    
+            this.world.rotation.x = target.x;    
+            this.world.rotation.y = target.y;    
+                
+            this.cameraRotation.x = target.x;    
+            this.cameraRotation.y = target.y;    
+                
+            this.isAnimating = false;    
+        }    
+    };    
 
+    requestAnimationFrame(animateTransition);
+}
+
+setPerspective3DView() {
+    if (!this.world) return;
+    this.world.rotation.x = -0.45;
+    this.world.rotation.y = 0.75;
 }
 
 getFaceStickersCompletedCount(faceCode) {
-// குறிப்பிட்ட ஒரு பக்கத்தில் பயனர் நிரப்பியுள்ள ஸ்டிக்கர்களின் எண்ணிக்கையைத் தரும்
-return this.stickers.filter(s => s.userData && s.userData.currentFace === faceCode && s.userData.color).length;
+    return this.stickers.filter(s => s.userData && s.userData.currentFace === faceCode && s.userData.color).length;
 }
 
 getTotalStickersCompletedCount() {
-// கியூப் முழுவதும் நிரப்பப்பட்டுள்ள மொத்த ஸ்டிக்கர்களின் எண்ணிக்கையைத் தரும் (Max 54)
-return this.stickers.filter(s => s.userData && s.userData.color).length;
-
+    return this.stickers.filter(s => s.userData && s.userData.color).length;
 }
 
 // =====================================================
@@ -908,7 +772,6 @@ return this.stickers.filter(s => s.userData && s.userData.color).length;
 // =====================================================
 
 getCubeString() {
-    // Kociemba Solver algorithm expects strict U -> R -> F -> D -> L -> B order
     const faceOrder = ["U", "R", "F", "D", "L", "B"];
     let cubeString = "";
 
@@ -920,7 +783,8 @@ getCubeString() {
         }
 
         for (const sticker of faceStickers) {
-            const faceLetter = sticker.userData.color || sticker.userData.initialFace || "U";
+            const rawColor = sticker.userData.color || sticker.userData.initialFace || "U";
+            const faceLetter = this.colorToFaceLetter[rawColor] || rawColor;
             cubeString += faceLetter;
         }
     }
@@ -944,7 +808,6 @@ getStickersForFace(faceName) {
         }
     });
 
-    // Grid Order sorting (Top-Left to Bottom-Right) for 3D faces
     return faceStickers.sort((a, b) => {
         const pA = a.pos;
         const pB = b.pos;
