@@ -3,10 +3,10 @@ import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
 /* ==========================================
-   Rubik Solver Pro - Complete Fixed App Engine
+   Rubik Solver Pro - Final Fixed Core Engine
 ========================================== */
 
-// Initialize Kociemba Solver Tables
+// Kociemba Initialization
 if (typeof Cube !== 'undefined' && Cube.initSolver) {
     try {
         Cube.initSolver();
@@ -50,7 +50,7 @@ async function startSplash() {
     let progress = 0;
     while (progress <= 100) {
         if (loadingProgress) loadingProgress.style.width = progress + "%";
-        await sleep(20);
+        await sleep(15);
         progress++;
     }
 
@@ -136,9 +136,7 @@ function updateColorCounters() {
     });
 }
 
-// Cube State
-const FACE_NAMES = ["U", "R", "F", "D", "L", "B"];
-
+// Cube State Data
 const cubeState = {
     U: Array(9).fill(null),
     R: Array(9).fill(null),
@@ -178,31 +176,29 @@ function updateValidateButton() {
 }
 
 function validateCube() {
-    const counts = { U: 0, R: 0, F: 0, D: 0, L: 0, B: 0 };
+    const counts = { white: 0, yellow: 0, red: 0, orange: 0, blue: 0, green: 0 };
 
     for (const face of Object.keys(cubeState)) {
         for (const sticker of cubeState[face]) {
             if (sticker === null) {
-                showToast("Complete all 54 stickers.");
+                showToast("Fill all 54 stickers first.");
                 return false;
             }
-            if (!(sticker in counts)) {
-                showToast("Invalid sticker detected.");
-                return false;
+            if (sticker in counts) {
+                counts[sticker]++;
             }
-            counts[sticker]++;
         }
     }
 
-    for (const face of Object.keys(counts)) {
-        if (counts[face] !== 9) {
-            showToast(`${face} count must be 9! Current: ${counts[face]}`);
+    for (const color of Object.keys(counts)) {
+        if (counts[color] !== 9) {
+            showToast(`Each color must be exactly 9! ${color}: ${counts[color]}`);
             return false;
         }
     }
 
     appState.cubeValidated = true;
-    showToast("Cube validation successful.");
+    showToast("Validation successful!");
     return true;
 }
 
@@ -220,7 +216,7 @@ if (validateBtn) {
 if (solveBtn) {
     solveBtn.addEventListener("click", () => {
         if (!appState.cubeValidated) {
-            showToast("Validate cube first.");
+            showToast("Validate face first.");
             return;
         }
         solveCube();
@@ -237,18 +233,9 @@ function refreshEditor() {
 refreshEditor();
 if (solveBtn) solveBtn.disabled = true;
 
-const COLOR_TO_FACE = {
-    white: "U",
-    red: "R",
-    green: "F",
-    yellow: "D",
-    orange: "L",
-    blue: "B"
-};
-
-/*
-   CRITICAL FIX: Correct Sticker Index Mapping for Kociemba 3D Space
-*/
+/* ==========================================
+   Precision 3D Sticker Indexing
+========================================== */
 function getStickerIndex(cubie, faceLetter) {
     const x = cubie.userData.x;
     const y = cubie.userData.y;
@@ -259,8 +246,8 @@ function getStickerIndex(cubie, faceLetter) {
         case "D": return (1 - z) * 3 + (x + 1);
         case "F": return (1 - y) * 3 + (x + 1);
         case "B": return (1 - y) * 3 + (1 - x);
-        case "R": return (1 - y) * 3 + (z + 1); // FIXED
-        case "L": return (1 - y) * 3 + (1 - z); // FIXED
+        case "R": return (1 - y) * 3 + (1 - z);
+        case "L": return (1 - y) * 3 + (z + 1);
         default: return -1;
     }
 }
@@ -286,7 +273,7 @@ const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
 directionalLight.position.set(5, 10, 7);
 scene.add(directionalLight);
 
-// Rubik's Cube Setup
+// Rubik's Cube Mesh Group
 const rubiksCube = new THREE.Group();
 const cubieSize = 0.95;
 const gap = 0.05;
@@ -320,7 +307,7 @@ for (let x = -1; x <= 1; x++) {
 scene.add(rubiksCube);
 const cubeRotation = new CubeRotation(rubiksCube);
 
-// Raycaster
+// Raycaster Click Handler
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
@@ -373,7 +360,9 @@ function onPointerDown(event) {
     cubie.material[faceIndex].color.setHex(colorMap[appState.selectedColor]);
 
     const stickerIndex = getStickerIndex(cubie, faceLetter);
-    cubeState[faceLetter][stickerIndex] = COLOR_TO_FACE[appState.selectedColor];
+    
+    // Store exact color name
+    cubeState[faceLetter][stickerIndex] = appState.selectedColor;
 
     updateFilledCounter();
     updateValidateButton();
@@ -419,21 +408,38 @@ window.addEventListener("resize", () => {
 });
 
 /* ==========================================
-   Kociemba Solver & 3D Animation Integration
+   DYNAMIC CENTER KOCIEMBA CONVERTER
 ========================================== */
-
 function getCubeString() {
-    const order = ["U", "R", "F", "D", "L", "B"];
-    let result = "";
-
-    for (const face of order) {
-        if (!cubeState[face] || cubeState[face].includes(null)) {
-            throw new Error(`Face ${face} is incomplete!`);
+    const faces = ["U", "R", "F", "D", "L", "B"];
+    
+    // Dynamic Center Color Map Construction
+    const centerToFaceMap = {};
+    for (const face of faces) {
+        const centerColor = cubeState[face][4]; // Index 4 is center piece
+        if (!centerColor) {
+            throw new Error(`Center color for face ${face} is missing!`);
         }
-        result += cubeState[face].join("");
+        centerToFaceMap[centerColor] = face;
     }
 
-    return result;
+    if (Object.keys(centerToFaceMap).length !== 6) {
+        throw new Error("Each face center must have a unique color!");
+    }
+
+    let kociembaString = "";
+    for (const face of faces) {
+        for (let i = 0; i < 9; i++) {
+            const color = cubeState[face][i];
+            const facelet = centerToFaceMap[color];
+            if (!facelet) {
+                throw new Error(`Unmapped color detected on face ${face}`);
+            }
+            kociembaString += facelet;
+        }
+    }
+
+    return kociembaString;
 }
 
 let isSolvingAnimation = false;
@@ -448,39 +454,36 @@ async function solveCube() {
         }
 
         const cubeString = getCubeString();
-        console.log("Kociemba String:", cubeString);
+        console.log("Generated Kociemba String:", cubeString);
 
         showToast("Calculating Solution...");
         isSolvingAnimation = true;
         if (solveBtn) solveBtn.disabled = true;
         if (validateBtn) validateBtn.disabled = true;
 
-        // Solution animation தொடங்குமுன் 3D Cube-ஐ Original View-க்கு Reset செய்தல்
+        // Reset View Orientation before starting animation
         rubiksCube.quaternion.set(0, 0, 0, 1);
         appState.currentFace = 0;
         updateFaceCounter();
 
+        // Non-blocking asynchronous calculation delay
         setTimeout(() => {
             try {
                 const cube = Cube.fromString(cubeString);
 
                 if (cube.isSolved()) {
                     showToast("Cube is already solved!");
-                    isSolvingAnimation = false;
-                    if (solveBtn) solveBtn.disabled = false;
-                    if (validateBtn) validateBtn.disabled = false;
+                    resetSolveState();
                     return;
                 }
 
-                // Maximum Depth Safety Limit (Max 22 moves)
+                // Solve with max 22 moves search depth
                 const solution = cube.solve(22);
-                console.log("Solution Moves:", solution);
+                console.log("Solution:", solution);
 
                 if (!solution || solution.trim() === "") {
                     showToast("Cube is already solved!");
-                    isSolvingAnimation = false;
-                    if (solveBtn) solveBtn.disabled = false;
-                    if (validateBtn) validateBtn.disabled = false;
+                    resetSolveState();
                     return;
                 }
 
@@ -489,32 +492,35 @@ async function solveCube() {
 
                 playSolutionQueue(moves);
             } catch (solveErr) {
-                console.error("Solve Error:", solveErr);
-                showToast("Invalid Cube arrangement! Check colors.");
-                isSolvingAnimation = false;
-                if (solveBtn) solveBtn.disabled = false;
-                if (validateBtn) validateBtn.disabled = false;
+                console.error("Solve Execution Error:", solveErr);
+                showToast("Invalid Cube Layout! Please check sticker colors.");
+                resetSolveState();
             }
-        }, 120);
+        }, 150);
 
     } catch (e) {
-        console.error("Parsing Error:", e);
-        showToast("Please fill all 54 stickers!");
-        isSolvingAnimation = false;
-        if (solveBtn) solveBtn.disabled = false;
-        if (validateBtn) validateBtn.disabled = false;
+        console.error("String Build Error:", e.message);
+        showToast(e.message || "Ensure all 54 stickers are filled!");
+        resetSolveState();
     }
 }
 
+function resetSolveState() {
+    isSolvingAnimation = false;
+    if (solveBtn) solveBtn.disabled = false;
+    if (validateBtn) validateBtn.disabled = false;
+}
+
+/* ==========================================
+   3D SLICE ROTATION ENGINE
+========================================== */
 function playSolutionQueue(moves) {
     let index = 0;
 
     function nextMove() {
         if (index >= moves.length) {
             showToast("Cube Solved Successfully! 🎉");
-            isSolvingAnimation = false;
-            if (solveBtn) solveBtn.disabled = false;
-            if (validateBtn) validateBtn.disabled = false;
+            resetSolveState();
             appState.cubeSolved = true;
             return;
         }
@@ -548,7 +554,6 @@ function rotateSlice(moveStr, callback) {
     scene.add(pivot);
 
     const targets = [];
-    // CRITICAL FIX: Local Position-ஐ பயன்படுத்தி Cubies-ஐ கண்டறிதல்
     rubiksCube.children.forEach(cubie => {
         if (Math.abs(cubie.position[axis] - layerVal) < 0.2) {
             targets.push(cubie);
