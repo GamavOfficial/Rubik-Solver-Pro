@@ -1,7 +1,7 @@
-// =====================================================
+// =======================================
 // Rubik Solver Pro
-// js/solver.js (Advanced & Complete Integrated Code)
-// =====================================================
+// js/solver.js
+// =======================================
 
 let solutionMoves = [];
 let solverReady = false;
@@ -10,82 +10,42 @@ let solverReady = false;
  * Initialize solver (Run only once)
  */
 function initializeSolver() {
-    if (solverReady) return true;
+    if (solverReady) return;
 
-    try {
-        if (typeof Cube !== 'undefined' && typeof Cube.initSolver === 'function') {
-            Cube.initSolver();
-            solverReady = true;
-            return true;
-        } else if (typeof Cube !== 'undefined') {
-            // சில Kociemba பதிப்புகளுக்கு initSolver தேவைப்படாது
-            solverReady = true;
-            return true;
-        }
-    } catch (err) {
-        console.error("Solver Initialization Exception:", err);
+    if (typeof Cube !== 'undefined' && Cube.initSolver) {
+        Cube.initSolver();
+        solverReady = true;
     }
-    return false;
 }
 
 /**
- * [REPLACE & UPGRADE] Convert CubeEngine stickers to 54-character Kociemba String (U R F D L B)
- * Supports both function calls and object properties safely.
+ * Convert 3D Cube / Editor State to 54-character Kociemba String (U R F D L B)
  */
 function getCubeString() {
-    let engine = window.cubeEngine;
-    
-    // Check if cubeEngine method exists
-    if (engine && typeof engine.getCubeString === "function") {
-        try {
-            const str = engine.getCubeString();
-            if (str && str.length === 54) return str;
-        } catch (e) {
-            console.warn("engine.getCubeString() failed, falling back to manual mapping:", e);
-        }
+    if (!window.cubeState && !window.rubiksCubeGroup) {
+        return null;
     }
 
-    // Fallback manual mapping if engine property exists
-    if (engine && engine.stickers && engine.stickers.length > 0) {
-        const faceOrder = ['U', 'R', 'F', 'D', 'L', 'B'];
-        let cubeString = "";
+    // Kociemba Algorithm-க்கு தேவையான சரியான பக்க வரிசை (U -> R -> F -> D -> L -> B)
+    const faceOrder = ['U', 'R', 'F', 'D', 'L', 'B'];
+    let cubeString = "";
 
-        const colorToLetter = {
-            "white": "U", "U": "U",
-            "yellow": "D", "D": "D",
-            "orange": "L", "L": "L",
-            "red": "R", "R": "R",
-            "green": "F", "F": "F",
-            "blue": "B", "B": "B"
-        };
-
+    // Editor-இல் உள்ள 6 பக்கங்களின் தரவுகளை URFDLB வரிசையில் இணைத்தல்
+    if (window.cubeState) {
         faceOrder.forEach(face => {
-            // Use Strollers order from engine if available
-            let faceStickers = [];
-            if (typeof engine.getStickersForFace === "function") {
-                faceStickers = engine.getStickersForFace(face);
-            } else {
-                faceStickers = engine.stickers.filter(
-                    s => s.userData && s.userData.currentFace === face
-                );
+            if (window.cubeState[face]) {
+                window.cubeState[face].forEach(sticker => {
+                    cubeString += sticker; // U, R, F, D, L, B எழுத்துகள்
+                });
             }
-            
-            faceStickers.forEach(item => {
-                const sticker = item.mesh || item;
-                const rawCol = sticker.userData.color || sticker.userData.initialFace || face;
-                cubeString += colorToLetter[rawCol] || rawCol;
-            });
         });
-
-        if (cubeString.length === 54) {
-            return cubeString;
-        }
     }
-    return null;
+
+    return cubeString;
 }
 
 /**
- * Solve Cube synchronously and return moves array
+ * Solve Cube and return moves array
  */
 function solveCube() {
     initializeSolver();
@@ -93,28 +53,17 @@ function solveCube() {
     const cubeString = getCubeString();
 
     if (!cubeString || cubeString.length !== 54) {
-        console.error("Invalid cube string state or incomplete stickers (Length != 54)");
+        console.error("Invalid cube string state");
+        alert("க்யூப் தரவு தவறாக உள்ளது!");
         return [];
     }
 
     try {
-        if (typeof Cube === 'undefined' || typeof Cube.fromString !== 'function') {
-            console.error("Kociemba Cube library is not loaded properly.");
-            return [];
-        }
-
         const parsedCube = Cube.fromString(cubeString);
-        
-        if (parsedCube.isSolved()) {
-            solutionMoves = [];
-            if (typeof loadSolution === 'function') loadSolution(solutionMoves);
-            return [];
-        }
-
         const solution = parsedCube.solve(22);
 
         if (!solution) {
-            console.error("Unable to solve cube layout. Invalid or impossible configuration.");
+            console.error("Unable to solve cube");
             return [];
         }
 
@@ -127,24 +76,9 @@ function solveCube() {
         return solutionMoves;
     } catch (err) {
         console.error("Solver Execution Error:", err);
+        alert("க்யூப்பைத் தீர்ப்பதில் பிழை: " + err.message);
         return [];
     }
-}
-
-/**
- * Solve Cube Asynchronously (Non-blocking UI using Promise / setTimeout)
- */
-function solveCubeAsync() {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            try {
-                const moves = solveCube();
-                resolve(moves);
-            } catch (err) {
-                reject(err);
-            }
-        }, 10);
-    });
 }
 
 /**
@@ -163,13 +97,3 @@ function resetSolver() {
         resetPlayer();
     }
 }
-
-// Export functions for modern module structures or global use
-export {
-    initializeSolver,
-    getCubeString,
-    solveCube,
-    solveCubeAsync,
-    getSolutionMoves,
-    resetSolver
-};
