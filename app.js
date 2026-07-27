@@ -475,16 +475,15 @@ validateBtn.addEventListener("click", () => {
 });
 
 /* ==========================================
-   Solve Button Event
+   Solve Button Event (Fixed Non-Blocking & Page Switch)
 ========================================== */
 
-solveBtn.addEventListener("click", () => {
+solveBtn.addEventListener("click", async () => {
     if (!appState.cubeValidated) {
         showToast("Validate cube first.");
         return;
     }
 
-    // 1. Get 54 Character String from Editor State
     const cubeString = window.getCubeString();
 
     if (!cubeString || cubeString.length !== 54 || cubeString.includes("null")) {
@@ -492,34 +491,46 @@ solveBtn.addEventListener("click", () => {
         return;
     }
 
-    try {
-        // 2. Initialize & Solve using Kociemba Algorithm
-        if (typeof Cube !== "undefined" && typeof Cube.initSolver === "function") {
-            Cube.initSolver();
+    showToast("Calculating Solution... Please wait");
+    solveBtn.disabled = true;
+
+    // UI பிரவுசர் ஹேங் ஆகாமல் இருக்க சிறிது இடைவெளி தருகிறது
+    await sleep(50);
+
+    setTimeout(() => {
+        try {
+            if (typeof Cube !== "undefined" && typeof Cube.initSolver === "function") {
+                Cube.initSolver();
+            }
+
+            const parsedCube = Cube.fromString(cubeString);
+
+            if (parsedCube.isSolved()) {
+                showToast("Cube is already solved!");
+                solveBtn.disabled = false;
+                return;
+            }
+
+            const solution = parsedCube.solve(22); // Maximum 22 moves
+
+            if (solution) {
+                const moves = solution.trim().split(/\s+/);
+                window.loadSolution(moves);
+            } else {
+                showToast("No solution found for this cube configuration.");
+                solveBtn.disabled = false;
+            }
+
+                } catch (err) {
+
+            console.error("Solver Error:", err);
+            showToast("Invalid Cube Layout! Check sticker colors.");
+            solveBtn.disabled = false;
         }
-
-        const parsedCube = Cube.fromString(cubeString);
-
-        if (parsedCube.isSolved()) {
-            showToast("Cube is already solved!");
-            return;
-        }
-
-        const solution = parsedCube.solve(22); // Maximum 22 moves
-
-        if (solution) {
-            const moves = solution.trim().split(/\s+/);
-            // 3. Trigger Solution Animation
-            window.loadSolution(moves);
-        } else {
-            showToast("No solution found for this cube configuration.");
-        }
-
-    } catch (err) {
-        console.error("Solver Error:", err);
-        showToast("Invalid Cube Layout! Check sticker colors.");
-    }
+    }, 50);
 });
+
+
 
 /* ==========================================
    Refresh UI
@@ -969,7 +980,7 @@ window.getCubeString = function() {
 
 
 /* ==========================================
-   Solution Animation Trigger
+   Solution Animation Trigger (Direct CSS Display Fix)
 ========================================== */
 window.loadSolution = function(moves) {
     if (!moves || moves.length === 0) {
@@ -977,7 +988,10 @@ window.loadSolution = function(moves) {
         return;
     }
 
+    // நேரடியாக style.display மாற்றுவதன் மூலம் பேஜ் மறைந்து அனிமேஷன் பேஜ் வருவது உறுதியாகும்
     if (editorPage && solverPage) {
+        editorPage.style.display = "none";
+        solverPage.style.display = "block";
         editorPage.classList.add("hidden");
         solverPage.classList.remove("hidden");
     }
