@@ -110,6 +110,24 @@ const colorUsage = {
     green: 0
 };
 
+/* ==========================================
+   CENTER COLOR LOCK SYSTEM
+========================================== */
+
+const centerColorLock = {
+    white: false,
+    yellow: false,
+    red: false,
+    orange: false,
+    blue: false,
+    green: false
+};
+
+function isCenterSticker(faceLetter, stickerIndex) {
+    return stickerIndex === 4;
+}
+
+
 setActiveColor("white");
 
 colorButtons.forEach(button => {
@@ -353,13 +371,32 @@ function onPointerDown(event) {
 
     if (previousColor === appState.selectedColor) return;
 
-    if (previousColor) colorUsage[previousColor]--;
+const stickerIndex = getStickerIndex(cubie, faceLetter);
+    
+    
+    // Center color restriction
+if (isCenterSticker(faceLetter, stickerIndex)) {
 
-    cubie.userData.painted[faceIndex] = appState.selectedColor;
-    colorUsage[appState.selectedColor]++;
-    cubie.material[faceIndex].color.setHex(colorMap[appState.selectedColor]);
+    if (
+        previousColor !== appState.selectedColor &&
+        centerColorLock[appState.selectedColor]
+    ) {
+        showToast(appState.selectedColor + " already assigned to another center.");
+        return;
+    }
 
-    const stickerIndex = getStickerIndex(cubie, faceLetter);
+    if (previousColor) {
+        centerColorLock[previousColor] = false;
+    }
+
+    centerColorLock[appState.selectedColor] = true;
+}
+
+if (previousColor) colorUsage[previousColor]--;
+
+cubie.userData.painted[faceIndex] = appState.selectedColor;
+colorUsage[appState.selectedColor]++;
+cubie.material[faceIndex].color.setHex(colorMap[appState.selectedColor]);
     
     // Store exact color name
     cubeState[faceLetter][stickerIndex] = appState.selectedColor;
