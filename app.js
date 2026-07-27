@@ -3,7 +3,7 @@ import * as THREE from "three";
 import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 // [NEW ADD] Import CubeAnimation for playback solution moves
-//import CubeAnimation, { ANIMATION_TYPES } from "./animation.js";
+import CubeAnimation, { ANIMATION_TYPES } from "./animation.js";
 
 
 
@@ -767,15 +767,7 @@ rubiksCube.position.set(0, 0, 0);
 const cubeRotation = new CubeRotation(rubiksCube);
 
 // ---------- [NEW ADD] Initialize Mock Engine bridge for Animation ----------
-const mockEngine = {
-    isAnimating: false,
-    turnSpeed: 400,
-    speed: { slow: 600, normal: 400, fast: 200 },
-    navigateToFace: (faceCode) => {},
-    enqueue: (move) => {}
-};
 
-cubeAnimation = new CubeAnimation(mockEngine);
 
 const stickers = [];
 
@@ -895,9 +887,6 @@ function animate() {
     cubeRotation.update();
 
     // ---------- [NEW ADD] Update Animation Engine ----------
-    if (cubeAnimation) {
-        cubeAnimation.update(0.016);
-    }
 
     renderer.render(scene, camera);
 
