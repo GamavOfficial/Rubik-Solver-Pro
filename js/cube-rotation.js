@@ -1,62 +1,90 @@
-/**
-==========================================================
-Rubik Solver Pro - Cube Rotation & Animation Engine
-js/cube-rotation.js
-==========================================================
-*/
-
 import * as THREE from "three";
 
 export class CubeRotation {
-    constructor(rubiksCubeGroup) {
-        this.cubeGroup = rubiksCubeGroup;
+
+    constructor(rubiksCube) {
+
+        this.cubeGroup = rubiksCube; // Main Rubiks Cube Group
         this.animating = false;
-        this.activeTween = null;
+        this.rotationSpeed = 0.12;
+
+        this.currentQuaternion = this.cubeGroup.quaternion.clone();
+        this.targetQuaternion = this.cubeGroup.quaternion.clone();
+        this.currentView = 0;
+
+        this.sequence = [
+            "right",
+            "up",
+            "right",
+            "right",
+            "up"
+        ];
+
+        // History array to store previous target quaternions for reverse operation
+        this.history = [];
     }
 
-    // கியூப் முழுவதையும் திருப்புவதற்கான மெத்தட் (Editor-ல் Next/Prev face பார்க்கும்போது பயன்படுவது)
-    rotate(direction, duration = 300) {
-        if (this.animating) return;
+    // Sequence-la irundhu NEXT step rotate panna
+    next() {
+        if (this.animating || this.currentView >= this.sequence.length) return;
+
+        const direction = this.sequence[this.currentView];
+        
+        // Push current target to history before moving to next step
+        this.history.push(this.targetQuaternion.clone());
+        
+        this.rotateView(direction);
+        this.currentView++;
+    }
+
+    // Previous step-ku exact-a REVERSE panna
+    previous() {
+        if (this.animating || this.history.length === 0) return;
+
         this.animating = true;
+        this.currentQuaternion.copy(this.cubeGroup.quaternion);
 
-        const targetRotation = this.cubeGroup.rotation.clone();
+        // Pop the previous exact quaternion state
+        const prevTarget = this.history.pop();
+        this.targetQuaternion.copy(prevTarget);
 
-        if (direction === "right") {
-            targetRotation.y += Math.PI / 2;
-        } else if (direction === "left") {
-            targetRotation.y -= Math.PI / 2;
-        } else if (direction === "up") {
-            targetRotation.x -= Math.PI / 2;
-        } else if (direction === "down") {
-            targetRotation.x += Math.PI / 2;
+        if (this.currentView > 0) {
+            this.currentView--;
+        }
+    }
+
+    rotateView(direction) {
+        if (this.animating) return;
+
+        this.animating = true;
+        this.currentQuaternion.copy(this.cubeGroup.quaternion);
+
+        const rotation = new THREE.Quaternion();
+
+        switch (direction) {
+            case "right":
+                rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
+                break;
+            case "left":
+                rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+                break;
+            case "up":
+                rotation.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+                break;
+            case "down":
+                rotation.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+                break;
+            default:
+                this.animating = false;
+                return;
         }
 
-        const startTime = performance.now();
-        const startRotation = this.cubeGroup.rotation.clone();
-
-        const animateRotation = (currentTime) => {
-            const elapsed = currentTime - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-
-            // Smooth easing
-            const easeProgress = 0.5 - Math.cos(progress * Math.PI) / 2;
-
-            this.cubeGroup.rotation.x = startRotation.x + (targetRotation.x - startRotation.x) * easeProgress;
-            this.cubeGroup.rotation.y = startRotation.y + (targetRotation.y - startRotation.y) * easeProgress;
-            this.cubeGroup.rotation.z = startRotation.z + (targetRotation.z - startRotation.z) * easeProgress;
-
-            if (progress < 1) {
-                requestAnimationFrame(animateRotation);
-            } else {
-                this.cubeGroup.rotation.copy(targetRotation);
-                this.animating = false;
-            }
-        };
-
-        requestAnimationFrame(animateRotation);
+        this.targetQuaternion.copy(this.currentQuaternion);
+        this.targetQuaternion.premultiply(rotation);
+        this.targetQuaternion.normalize();
     }
 
-    // சால்வ் மூவ்ஸ்களை (எ.கா: R, U, R', F2) கியூபில் அனிமேட் செய்து காட்டக்கூடிய மெத்தட்
+    // [UPGRADED]: கியூப் சால்வ் மூவ்ஸ்களை (எ.கா: R, U, R', F2) லேயர் வாரியாக அனிமேட் செய்யும் பகுதி
     executeMove(moveStr, callback) {
         if (this.animating) return;
         this.animating = true;
@@ -68,7 +96,6 @@ export class CubeRotation {
         let layerCheck = (c) => c.userData.y === 1;
         let angle = -Math.PI / 2;
 
-        // முகங்களுக்கு ஏற்ப அச்சு (Axis) மற்றும் லேயர்களைத் தீர்மானித்தல்
         switch (face) {
             case "U":
                 axis = "y";
@@ -108,7 +135,7 @@ export class CubeRotation {
             angle = angle * 2;
         }
 
-        // குறிப்பிட்ட லேயர் கியூப்களை மட்டும் ஒரு தற்காலிக குரூப்பில் இணைத்தல்
+        // தற்காலிகமாக குறிப்பிட்ட லேயரை மட்டும் திருப்புவதற்காக Pivot உருவாக்குதல்
         const pivot = new THREE.Group();
         this.cubeGroup.add(pivot);
 
@@ -123,7 +150,7 @@ export class CubeRotation {
             pivot.attach(cubie);
         });
 
-        const duration = 250; // அனிமேஷன் வேகம் (ms)
+        const duration = 250; // Animation Speed (ms)
         const startTime = performance.now();
 
         const animateMove = (currentTime) => {
@@ -139,11 +166,9 @@ export class CubeRotation {
                 pivot.rotation[axis] = angle;
                 pivot.updateMatrixWorld(true);
 
-                // பொசிஷன்களை மீண்டும் மெயின் கியூபிற்கு மாற்றுதல்
                 movingCubies.forEach(cubie => {
                     this.cubeGroup.attach(cubie);
                     
-                    // பொசிஷன் மற்றும் ரொட்டேஷனை சரியாக ரவுண்ட் செய்வுதல்
                     cubie.position.x = Math.round(cubie.position.x);
                     cubie.position.y = Math.round(cubie.position.y);
                     cubie.position.z = Math.round(cubie.position.z);
@@ -165,11 +190,23 @@ export class CubeRotation {
         requestAnimationFrame(animateMove);
     }
 
+    update() {
+        // Viewer-ன் முழு கியூப் ரொட்டேஷனுக்கான slerp அப்டேட்
+        if (this.cubeGroup.quaternion.angleTo(this.targetQuaternion) > 0.001) {
+            this.cubeGroup.quaternion.slerp(
+                this.targetQuaternion,
+                this.rotationSpeed
+            );
+            this.animating = true;
+        } else {
+            this.cubeGroup.quaternion.copy(this.targetQuaternion);
+            // layer animation இல்லாத போது மட்டும் animating false செய்யப்படும்
+        }
+    }
+
     isAnimating() {
         return this.animating;
     }
 
-    update() {
-        // Frame update loop if needed
-    }
 }
+
