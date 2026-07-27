@@ -3,7 +3,7 @@ import * as THREE from "three";
 import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
-//Cube.initSolver();
+Cube.initSolver();
 
 
 /* ==========================================
@@ -70,43 +70,42 @@ function showToast(message) {
 
 async function startSplash() {
 
-    const loadingProgress = document.getElementById("loading-progress");
-    if (loadingProgress) {
-        let progress = 0;
-        const interval = setInterval(() => {
-            progress += 5;
-            if (progress > 100) {
-                progress = 100;
-                clearInterval(interval);
-            }
-            loadingProgress.style.width = progress + "%";
-        }, 15);
+    let progress = 0;
+
+    while (progress <= 100) {
+
+        loadingProgress.style.width = progress + "%";
+
+        await sleep(25);
+
+        progress++;
+
     }
 
-    // 1.5 விநாடிகள் கழித்து கட்டாயம் ஸ்பிளாஸ் ஸ்கிரினை மறைக்க
-    await sleep(1500);
+splashScreen.classList.add("hidden");
 
-    if (splashScreen) {
-        splashScreen.style.display = "none"; // கிளாஸ்க்கு பதிலாக நேரடியாக மறைக்க
-    }
-    if (mainApp) {
-        mainApp.classList.remove("hidden");
-    }
+mainApp.classList.remove("hidden");
 
-    try {
-        camera.aspect = viewer.clientWidth / viewer.clientHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(viewer.clientWidth, viewer.clientHeight);
-        renderer.render(scene, camera);
-    } catch (e) {
-        console.error(e);
-    }
+setTimeout(() => {
 
-    showToast("Welcome to Rubik Solver Pro");
+    camera.aspect =
+        viewer.clientWidth /
+        viewer.clientHeight;
+
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(
+        viewer.clientWidth,
+        viewer.clientHeight
+    );
+
+    renderer.render(scene, camera);
+
+}, 100);
+
+showToast("Welcome to Rubik Solver Pro");
 
 }
-
-
 
 // ---------- Start App ----------
 
@@ -486,7 +485,7 @@ validateBtn.addEventListener("click", () => {
 });
 
 /* ==========================================
-   Solve Button Event & Function (Updated)
+   Solve Button Event
 ========================================== */
 
 solveBtn.addEventListener("click", () => {
@@ -496,63 +495,9 @@ solveBtn.addEventListener("click", () => {
         return;
     }
 
-    // 1. எடிட்டர் பக்கத்தை மறைத்து, சால்வர் பக்கத்தை (Solver Page) வெளிப்படுத்த
-    if (typeof editorPage !== "undefined" && typeof solverPage !== "undefined") {
-        editorPage.classList.add("hidden");
-        solverPage.classList.remove("hidden");
-    }
-
-    // 2. கியூப் சால்வ் செய்து அனிமேஷனைத் தொடங்குவது
     solveCube(cubeState);
 
 });
-
-// solveCube பங்க்ஷனையும் பிரவுசர் ஃப்ரீஸ் ஆகாதவாறு இதைச் சேர்த்துக்கொள்ளவும்
-async function solveCube(cubeState) {
-    const cubeString = getCubeString();
-    try {
-        if (typeof Cube === "undefined") {
-            showToast("Cube library not loaded.");
-            return;
-        }
-
-        const cube = Cube.fromString(cubeString);
-        if (cube.isSolved()) {
-            showToast("Cube is already solved!");
-            return;
-        }
-
-        // பிரவுசர் ஃப்ரீஸ் ஆகாமல் இருக்க சிறிய தாமதம்
-        await sleep(50);
-
-        const solution = cube.solve();
-        console.log("Solution Moves:", solution);
-        
-        // சால்வ் ஆன மூவ்களை ஸ்பேஸ் வைத்து பிரித்து அனிமேஷன் கியூவில் இயக்குவது
-        const movesArray = solution.trim().split(/\s+/);
-        if (movesArray.length > 0 && movesArray[0] !== "") {
-            showToast(`Solved in ${movesArray.length} moves! Playing animation...`);
-            
-            // சால்வ் ஆன மொத்த மூவ்ஸ் எண்ணிக்கையை UI-ல் காட்ட (உதாரணமாக: 1 / 33 போன்ற இடங்களில்)
-            const totalMovesElement = document.getElementById("total-moves"); // உங்கள் HTML-க்கு ஏற்ப இருந்தால் வேலை செய்யும்
-            if(totalMovesElement) totalMovesElement.textContent = movesArray.length;
-
-            playSolutionQueue(movesArray);
-        }
-
-    } catch (e) {
-        showToast("Error solving cube. Check colors.");
-        console.error(e);
-        
-        // எரர் வந்தால் எடிட்டர் பக்கத்திற்கே திரும்ப வர
-        if (typeof editorPage !== "undefined" && typeof solverPage !== "undefined") {
-            solverPage.classList.add("hidden");
-            editorPage.classList.remove("hidden");
-        }
-    }
-}
-
-
 
 /* ==========================================
    Refresh UI
@@ -593,28 +538,16 @@ function getStickerIndex(cubie, faceLetter) {
     const z = cubie.userData.z;
 
     switch (faceLetter) {
-        case "U":
-            return (z + 1) * 3 + (x + 1);
-
-        case "D":
-            return (1 - z) * 3 + (1 - x);
-
-        case "F":
-            return (1 - y) * 3 + (x + 1);
-
-        case "B":
-            return (1 - y) * 3 + (1 - x);
-
-        case "R":
-            return (1 - y) * 3 + (z + 1);
-
-        case "L":
-            return (1 - y) * 3 + (1 - z);
-
-        default:
-            return -1;
+        case "U": return (z + 1) * 3 + (x + 1);
+        case "D": return (1 - z) * 3 + (x + 1);
+        case "F": return (1 - y) * 3 + (x + 1);
+        case "B": return (1 - y) * 3 + (1 - x);
+        case "R": return (1 - y) * 3 + (1 - z);
+        case "L": return (1 - y) * 3 + (z + 1);
+        default: return -1;
     }
 }
+
 /* ==========================================
    Three.js Scene Setup
 ========================================== */
@@ -965,34 +898,134 @@ previousFaceBtn.addEventListener("click", () => {
 
 });
 
-async function solveCube(cubeState) {
-    const cubeString = getCubeString();
-    try {
-        if (typeof Cube === "undefined") {
-            showToast("Cube library not loaded.");
-            return;
-        }
+/* ==========================================
+   Kociemba Solver & 3D Animation Integration
+========================================== */
+let isSolvingAnimation = false;
 
+async function solveCube(cubeState) {
+    if (isSolvingAnimation) return;
+
+    const cubeString = getCubeString();
+
+    try {
+        // Kociemba Algorithm Execution
         const cube = Cube.fromString(cubeString);
+
         if (cube.isSolved()) {
             showToast("Cube is already solved!");
             return;
         }
 
         const solution = cube.solve();
-        console.log("Solution Moves:", solution);
-        
-        // சால்வ் ஆன மூவ்களை ஸ்பேஸ் வைத்து பிரித்து அனிமேஷன் கியூவில் இயக்குவது
-        const movesArray = solution.trim().split(/\s+/);
-        if (movesArray.length > 0 && movesArray[0] !== "") {
-            showToast(`Solved in ${movesArray.length} moves! Playing animation...`);
-            playSolutionQueue(movesArray);
+
+        if (!solution || solution.trim() === "") {
+            showToast("Cube is already solved!");
+            return;
         }
 
+        const moves = solution.trim().split(/\s+/);
+        showToast(`Solved in ${moves.length} moves! Animating...`);
+
+        // Start step-by-step 3D rotation animation
+        playSolutionQueue(moves);
+
     } catch (e) {
-        showToast("Error solving cube. Check colors.");
-        console.error(e);
+        console.error("Solver Error:", e);
+        showToast("Invalid cube configuration! Check sticker colors.");
     }
+}
+
+/* ==========================================
+   3D Slice Rotation Engine (Queue Execution)
+========================================== */
+function playSolutionQueue(moves) {
+    isSolvingAnimation = true;
+    solveBtn.disabled = true;
+    validateBtn.disabled = true;
+
+    let index = 0;
+
+    function nextMove() {
+        if (index >= moves.length) {
+            showToast("Cube Solved Successfully!");
+            isSolvingAnimation = false;
+            validateBtn.disabled = false;
+            appState.cubeSolved = true;
+            return;
+        }
+
+        const move = moves[index++];
+        rotateSlice(move, () => setTimeout(nextMove, 180));
+    }
+
+    nextMove();
+}
+
+function rotateSlice(moveStr, callback) {
+    const face = moveStr[0];
+    const modifier = moveStr.slice(1);
+
+    let angle = -Math.PI / 2; // Default Clockwise
+    if (modifier === "'") angle = Math.PI / 2; // Counter-clockwise
+    if (modifier === "2") angle = -Math.PI;   // 180-degree turn
+
+    let axis = "y";
+    let layerVal = cubieSize + gap;
+
+    // Axis & Direction Assignment for Rubik Notation
+    if (face === "U") { axis = "y"; layerVal = cubieSize + gap; angle = -angle; }
+    if (face === "D") { axis = "y"; layerVal = -(cubieSize + gap); }
+    if (face === "R") { axis = "x"; layerVal = cubieSize + gap; angle = -angle; }
+    if (face === "L") { axis = "x"; layerVal = -(cubieSize + gap); }
+    if (face === "F") { axis = "z"; layerVal = cubieSize + gap; angle = -angle; }
+    if (face === "B") { axis = "z"; layerVal = -(cubieSize + gap); }
+
+    // Temporary Pivot Group for rotating current layer cubies
+    const pivot = new THREE.Group();
+    scene.add(pivot);
+
+    const targets = [];
+    rubiksCube.children.forEach(cubie => {
+        const wPos = new THREE.Vector3();
+        cubie.getWorldPosition(wPos);
+        if (Math.abs(wPos[axis] - layerVal) < 0.2) {
+            targets.push(cubie);
+        }
+    });
+
+    targets.forEach(c => pivot.attach(c));
+
+    let start = null;
+    const duration = 220; // Ms per rotation step
+
+    function animateTurn(timestamp) {
+        if (!start) start = timestamp;
+        const elapsed = timestamp - start;
+        const progress = Math.min(elapsed / duration, 1);
+
+        pivot.rotation[axis] = angle * progress;
+
+        if (progress < 1) {
+            requestAnimationFrame(animateTurn);
+        } else {
+            pivot.rotation[axis] = angle;
+            pivot.updateMatrixWorld();
+
+            // Re-attach cubies back to main cube group and snap position
+            targets.forEach(c => {
+                rubiksCube.attach(c);
+                c.position.x = Math.round(c.position.x * 100) / 100;
+                c.position.y = Math.round(c.position.y * 100) / 100;
+                c.position.z = Math.round(c.position.z * 100) / 100;
+            });
+
+            scene.remove(pivot);
+            if (callback) callback();
+        }
+    }
+
+    requestAnimationFrame(animateTurn);
 }
 
 
@@ -1034,29 +1067,3 @@ window.addEventListener(
     }
 );
 
-// சால்வ் மூவ்ஸ்களை வரிசையாக அனிமேட் செய்யக்கூடிய பங்க்ஷன்
-function playSolutionQueue(moves) {
-    let index = 0;
-
-    function executeNextMove() {
-        if (index >= moves.length) {
-            showToast("Cube Solved Successfully!");
-            return;
-        }
-
-        const moveStr = moves[index];
-        index++;
-
-        console.log(`Executing move: ${moveStr}`);
-        
-        if (typeof cubeRotation !== "undefined" && cubeRotation.executeMove) {
-            cubeRotation.executeMove(moveStr, () => {
-                setTimeout(executeNextMove, 150);
-            });
-        } else {
-            setTimeout(executeNextMove, 300);
-        }
-    }
-
-    executeNextMove();
-}
