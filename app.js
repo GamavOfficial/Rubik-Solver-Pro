@@ -3,7 +3,7 @@ import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
 /* ==========================================
-   Rubik Solver Pro - Final Fixed Core Engine
+   Rubik Solver Pro - 100% Synced Core Engine
 ========================================== */
 
 // Kociemba Initialization
@@ -89,7 +89,7 @@ function applyTheme(theme) {
     if (themeBtn) themeBtn.textContent = theme === "dark" ? "🌙" : "☀️";
 }
 
-// Color Picker
+// Color Picker System
 const colorButtons = document.querySelectorAll(".color-btn");
 
 const colorCounters = {
@@ -109,23 +109,6 @@ const colorUsage = {
     blue: 0,
     green: 0
 };
-
-/* ==========================================
-   CENTER COLOR LOCK SYSTEM
-========================================== */
-
-const centerColorLock = {
-    white: false,
-    yellow: false,
-    red: false,
-    orange: false,
-    blue: false,
-    green: false
-};
-
-function isCenterSticker(faceLetter, stickerIndex) {
-    return stickerIndex === 4;
-}
 
 setActiveColor("white");
 
@@ -153,16 +136,6 @@ function updateColorCounters() {
     });
 }
 
-// Cube State Data
-const cubeState = {
-    U: Array(9).fill(null),
-    R: Array(9).fill(null),
-    F: Array(9).fill(null),
-    D: Array(9).fill(null),
-    L: Array(9).fill(null),
-    B: Array(9).fill(null)
-};
-
 const filledCount = document.getElementById("filled-count");
 const validateBtn = document.getElementById("validate-btn");
 const solveBtn = document.getElementById("solve-btn");
@@ -171,10 +144,6 @@ const nextFaceBtn = document.getElementById("next-face");
 
 const editorPage = document.getElementById("editor-page");
 const solverPage = document.getElementById("solver-page");
-
-const colorPicker = document.getElementById("color-picker");
-const progressBox = document.querySelector(".progress-box");
-const editorControls = document.querySelector(".editor-controls");
 const solverViewer = document.getElementById("solver-viewer");
 
 const currentMoveLabel = document.getElementById("current-move");
@@ -190,10 +159,12 @@ function updateFaceCounter() {
 
 function updateFilledCounter() {
     let total = 0;
-    Object.values(cubeState).forEach(face => {
-        face.forEach(sticker => {
-            if (sticker !== null) total++;
-        });
+    rubiksCube.children.forEach(cubie => {
+        if (cubie.userData && cubie.userData.painted) {
+            cubie.userData.painted.forEach(color => {
+                if (color !== null) total++;
+            });
+        }
     });
 
     appState.filledStickers = total;
@@ -206,17 +177,22 @@ function updateValidateButton() {
 
 function validateCube() {
     const counts = { white: 0, yellow: 0, red: 0, orange: 0, blue: 0, green: 0 };
+    let totalStickers = 0;
 
-    for (const face of Object.keys(cubeState)) {
-        for (const sticker of cubeState[face]) {
-            if (sticker === null) {
-                showToast("Fill all 54 stickers first.");
-                return false;
-            }
-            if (sticker in counts) {
-                counts[sticker]++;
-            }
+    rubiksCube.children.forEach(cubie => {
+        if (cubie.userData && cubie.userData.painted) {
+            cubie.userData.painted.forEach(color => {
+                if (color !== null) {
+                    totalStickers++;
+                    if (color in counts) counts[color]++;
+                }
+            });
         }
+    });
+
+    if (totalStickers !== 54) {
+        showToast("Fill all 54 stickers first.");
+        return false;
     }
 
     for (const color of Object.keys(counts)) {
@@ -250,35 +226,6 @@ if (solveBtn) {
         }
         solveCube();
     });
-}
-
-function refreshEditor() {
-    updateFaceCounter();
-    updateFilledCounter();
-    updateValidateButton();
-    updateColorCounters();
-}
-
-refreshEditor();
-if (solveBtn) solveBtn.disabled = true;
-
-/* ==========================================
-   Precision 3D Sticker Indexing
-========================================== */
-function getStickerIndex(cubie, faceLetter) {
-    const x = cubie.userData.x;
-    const y = cubie.userData.y;
-    const z = cubie.userData.z;
-
-    switch (faceLetter) {
-        case "U": return (z + 1) * 3 + (x + 1);
-        case "D": return (1 - z) * 3 + (x + 1);
-        case "F": return (1 - y) * 3 + (x + 1);
-        case "B": return (1 - y) * 3 + (1 - x);
-        case "R": return (1 - y) * 3 + (1 - z);
-        case "L": return (1 - y) * 3 + (z + 1);
-        default: return -1;
-    }
 }
 
 // Three.js Scene Setup
@@ -325,7 +272,7 @@ for (let x = -1; x <= 1; x++) {
 
             cubie.userData = {
                 x, y, z,
-                painted: [null, null, null, null, null, null]
+                painted: [null, null, null, null, null, null] // 0:R, 1:L, 2:U, 3:D, 4:F, 5:B
             };
 
             rubiksCube.add(cubie);
@@ -336,7 +283,7 @@ for (let x = -1; x <= 1; x++) {
 scene.add(rubiksCube);
 const cubeRotation = new CubeRotation(rubiksCube);
 
-// Raycaster Click Handler
+// Pointer Painting System
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
@@ -356,24 +303,23 @@ function onPointerDown(event) {
 
     const hit = intersects[0];
     const cubie = hit.object;
-    const faceIndex = Math.floor(hit.faceIndex / 2);
-    const previousColor = cubie.userData.painted[faceIndex];
-    const faceLetter = ["R", "L", "U", "D", "F", "B"][faceIndex];
+    const faceIndex = Math.floor(hit.faceIndex / 2); // Local Material Index 0..5
 
-    const x = cubie.userData.x;
-    const y = cubie.userData.y;
-    const z = cubie.userData.z;
+    const { x, y, z } = cubie.userData;
 
+    // Outer face protection
     if (
-        (faceLetter === "R" && x !== 1) ||
-        (faceLetter === "L" && x !== -1) ||
-        (faceLetter === "U" && y !== 1) ||
-        (faceLetter === "D" && y !== -1) ||
-        (faceLetter === "F" && z !== 1) ||
-        (faceLetter === "B" && z !== -1)
+        (faceIndex === 0 && x !== 1) ||
+        (faceIndex === 1 && x !== -1) ||
+        (faceIndex === 2 && y !== 1) ||
+        (faceIndex === 3 && y !== -1) ||
+        (faceIndex === 4 && z !== 1) ||
+        (faceIndex === 5 && z !== -1)
     ) {
         return;
     }
+
+    const previousColor = cubie.userData.painted[faceIndex];
 
     if (previousColor !== appState.selectedColor && colorUsage[appState.selectedColor] >= 9) {
         showToast(appState.selectedColor + " limit reached (9/9)");
@@ -382,34 +328,11 @@ function onPointerDown(event) {
 
     if (previousColor === appState.selectedColor) return;
 
-    const stickerIndex = getStickerIndex(cubie, faceLetter);
-    
-    // Center color restriction
-    if (isCenterSticker(faceLetter, stickerIndex)) {
-
-        if (
-            previousColor !== appState.selectedColor &&
-            centerColorLock[appState.selectedColor]
-        ) {
-            showToast(appState.selectedColor + " already assigned to another center.");
-            return;
-        }
-
-        if (previousColor) {
-            centerColorLock[previousColor] = false;
-        }
-
-        centerColorLock[appState.selectedColor] = true;
-    }
-
     if (previousColor) colorUsage[previousColor]--;
 
     cubie.userData.painted[faceIndex] = appState.selectedColor;
     colorUsage[appState.selectedColor]++;
     cubie.material[faceIndex].color.setHex(colorMap[appState.selectedColor]);
-    
-    // Store exact color name
-    cubeState[faceLetter][stickerIndex] = appState.selectedColor;
 
     updateFilledCounter();
     updateValidateButton();
@@ -451,14 +374,77 @@ if (previousFaceBtn) {
 window.addEventListener("resize", resizeRenderer);
 
 /* ==========================================
-   DYNAMIC CENTER KOCIEMBA CONVERTER
+   DIRECT 3D CUBE STATE READER
 ========================================== */
+function getCubieAt(x, y, z) {
+    return rubiksCube.children.find(c => 
+        c.userData && c.userData.x === x && c.userData.y === y && c.userData.z === z
+    );
+}
+
+function getFaceColorsFrom3DCube() {
+    rubiksCube.quaternion.set(0, 0, 0, 1); // Reset view angle to base
+
+    const faceColors = { U: [], R: [], F: [], D: [], L: [], B: [] };
+
+    // U Face (y = 1, Material 2)
+    for (let z = -1; z <= 1; z++) {
+        for (let x = -1; x <= 1; x++) {
+            const c = getCubieAt(x, 1, z);
+            faceColors.U.push(c ? c.userData.painted[2] : null);
+        }
+    }
+
+    // R Face (x = 1, Material 0)
+    for (let y = 1; y >= -1; y--) {
+        for (let z = 1; z >= -1; z--) {
+            const c = getCubieAt(1, y, z);
+            faceColors.R.push(c ? c.userData.painted[0] : null);
+        }
+    }
+
+    // F Face (z = 1, Material 4)
+    for (let y = 1; y >= -1; y--) {
+        for (let x = -1; x <= 1; x++) {
+            const c = getCubieAt(x, y, 1);
+            faceColors.F.push(c ? c.userData.painted[4] : null);
+        }
+    }
+
+    // D Face (y = -1, Material 3)
+    for (let z = 1; z >= -1; z--) {
+        for (let x = -1; x <= 1; x++) {
+            const c = getCubieAt(x, -1, z);
+            faceColors.D.push(c ? c.userData.painted[3] : null);
+        }
+    }
+
+    // L Face (x = -1, Material 1)
+    for (let y = 1; y >= -1; y--) {
+        for (let z = -1; z <= 1; z++) {
+            const c = getCubieAt(-1, y, z);
+            faceColors.L.push(c ? c.userData.painted[1] : null);
+        }
+    }
+
+    // B Face (z = -1, Material 5)
+    for (let y = 1; y >= -1; y--) {
+        for (let x = 1; x >= -1; x--) {
+            const c = getCubieAt(x, y, -1);
+            faceColors.B.push(c ? c.userData.painted[5] : null);
+        }
+    }
+
+    return faceColors;
+}
+
 function getCubeString() {
+    const faceColors = getFaceColorsFrom3DCube();
     const faces = ["U", "R", "F", "D", "L", "B"];
-    
+
     const centerToFaceMap = {};
     for (const face of faces) {
-        const centerColor = cubeState[face][4];
+        const centerColor = faceColors[face][4]; // Center sticker
         if (!centerColor) {
             throw new Error(`Center color for face ${face} is missing!`);
         }
@@ -472,7 +458,10 @@ function getCubeString() {
     let kociembaString = "";
     for (const face of faces) {
         for (let i = 0; i < 9; i++) {
-            const color = cubeState[face][i];
+            const color = faceColors[face][i];
+            if (!color) {
+                throw new Error(`Unpainted sticker found on face ${face}`);
+            }
             const facelet = centerToFaceMap[color];
             if (!facelet) {
                 throw new Error(`Unmapped color detected on face ${face}`);
@@ -485,53 +474,32 @@ function getCubeString() {
 }
 
 function resizeRenderer() {
-
-    const activeViewer =
-        solverPage && !solverPage.classList.contains("hidden")
-            ? solverViewer
-            : viewer;
-
+    const activeViewer = solverPage && !solverPage.classList.contains("hidden") ? solverViewer : viewer;
     if (!activeViewer) return;
 
     camera.aspect = activeViewer.clientWidth / activeViewer.clientHeight;
     camera.updateProjectionMatrix();
-
-    renderer.setSize(
-        activeViewer.clientWidth,
-        activeViewer.clientHeight
-    );
-
+    renderer.setSize(activeViewer.clientWidth, activeViewer.clientHeight);
 }
 
 function showSolverPage() {
-
-    if (editorPage) {
-        editorPage.classList.add("hidden");
-    }
-
-    if (solverPage) {
-        solverPage.classList.remove("hidden");
-    }
+    if (editorPage) editorPage.classList.add("hidden");
+    if (solverPage) solverPage.classList.remove("hidden");
 
     if (solverViewer && renderer.domElement.parentNode !== solverViewer) {
         solverViewer.appendChild(renderer.domElement);
     }
 
     resizeRenderer();
-    
     camera.position.set(5, 5, 5);
     camera.lookAt(0, 0, 0);
-
     renderer.render(scene, camera);
-
 }
-    
+
 let isSolvingAnimation = false;
 let solutionMoves = [];
 let currentMoveIndex = 0;
-let animationState = "idle"; 
-let animationSpeed = 1;
-let animationTimer = null;
+let animationState = "idle";
 
 async function solveCube() {
     if (isSolvingAnimation) return;
@@ -551,12 +519,7 @@ async function solveCube() {
         if (solveBtn) solveBtn.disabled = true;
         if (validateBtn) validateBtn.disabled = true;
 
-        // Reset View Orientation before starting animation
         rubiksCube.quaternion.set(0, 0, 0, 1);
-        if (cubeRotation) {
-            if (cubeRotation.targetQuaternion) cubeRotation.targetQuaternion.set(0, 0, 0, 1);
-            if (cubeRotation.currentQuaternion) cubeRotation.currentQuaternion.set(0, 0, 0, 1);
-        }
         appState.currentFace = 0;
         updateFaceCounter();
 
@@ -601,22 +564,16 @@ async function solveCube() {
 }
 
 function updateMoveUI() {
-
     if (currentMoveLabel) {
-        currentMoveLabel.textContent =
-            solutionMoves[currentMoveIndex] || "-";
+        currentMoveLabel.textContent = solutionMoves[currentMoveIndex] || "-";
     }
-
     if (moveCounterLabel) {
-        moveCounterLabel.textContent =
-            `${currentMoveIndex + 1} / ${solutionMoves.length}`;
+        moveCounterLabel.textContent = `${currentMoveIndex + 1} / ${solutionMoves.length}`;
     }
-
     if (moveProgress) {
         moveProgress.max = solutionMoves.length || 1;
         moveProgress.value = currentMoveIndex;
     }
-
 }
 
 function resetSolveState() {
@@ -626,7 +583,7 @@ function resetSolveState() {
 }
 
 /* ==========================================
-   3D SLICE ROTATION ENGINE (FULLY FIXED)
+   3D SLICE ROTATION ENGINE
 ========================================== */
 function playSolutionQueue(moves) {
     let index = 0;
