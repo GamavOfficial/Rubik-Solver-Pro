@@ -320,6 +320,52 @@ function onPointerDown(event) {
         return;
     }
 
+    // UNIQUE CENTER COLOR CHECK
+    const isCenter = (
+        (faceIndex === 0 && x === 1 && y === 0 && z === 0) ||
+        (faceIndex === 1 && x === -1 && y === 0 && z === 0) ||
+        (faceIndex === 2 && x === 0 && y === 1 && z === 0) ||
+        (faceIndex === 3 && x === 0 && y === -1 && z === 0) ||
+        (faceIndex === 4 && x === 0 && y === 0 && z === 1) ||
+        (faceIndex === 5 && x === 0 && y === 0 && z === -1)
+    );
+
+    if (isCenter) {
+        let usedInOtherCenter = false;
+
+        rubiksCube.children.forEach(otherCubie => {
+            if (!otherCubie.userData || !otherCubie.userData.painted) return;
+            const ox = otherCubie.userData.x;
+            const oy = otherCubie.userData.y;
+            const oz = otherCubie.userData.z;
+
+            // Check if selected color is already present in any OTHER center
+            if (ox === 1 && oy === 0 && oz === 0 && (x !== 1 || y !== 0 || z !== 0)) {
+                if (otherCubie.userData.painted[0] === appState.selectedColor) usedInOtherCenter = true;
+            }
+            if (ox === -1 && oy === 0 && oz === 0 && (x !== -1 || y !== 0 || z !== 0)) {
+                if (otherCubie.userData.painted[1] === appState.selectedColor) usedInOtherCenter = true;
+            }
+            if (ox === 0 && oy === 1 && oz === 0 && (x !== 0 || y !== 1 || z !== 0)) {
+                if (otherCubie.userData.painted[2] === appState.selectedColor) usedInOtherCenter = true;
+            }
+            if (ox === 0 && oy === -1 && oz === 0 && (x !== 0 || y !== -1 || z !== 0)) {
+                if (otherCubie.userData.painted[3] === appState.selectedColor) usedInOtherCenter = true;
+            }
+            if (ox === 0 && oy === 0 && oz === 1 && (x !== 0 || y !== 0 || z !== 1)) {
+                if (otherCubie.userData.painted[4] === appState.selectedColor) usedInOtherCenter = true;
+            }
+            if (ox === 0 && oy === 0 && oz === -1 && (x !== 0 || y !== 0 || z !== -1)) {
+                if (otherCubie.userData.painted[5] === appState.selectedColor) usedInOtherCenter = true;
+            }
+        });
+
+        if (usedInOtherCenter) {
+            showToast(`Center color '${appState.selectedColor}' already used!`);
+            return;
+        }
+    }
+
     const previousColor = cubie.userData.painted[faceIndex];
 
     if (previousColor !== appState.selectedColor && colorUsage[appState.selectedColor] >= 9) {
@@ -538,7 +584,6 @@ function simplifyMoves(moves) {
 }
 
 function findOptimalSolution(cube) {
-    // Dynamically search for shortest depth (1 to 24) instead of fixed 22
     for (let depth = 1; depth <= 22; depth++) {
         try {
             const sol = cube.solve(depth);
@@ -549,7 +594,7 @@ function findOptimalSolution(cube) {
             // Searching next depth
         }
     }
-    return cube.solve(); // Default fallback
+    return cube.solve();
 }
 
 async function solveCube() {
@@ -584,7 +629,6 @@ async function solveCube() {
                     return;
                 }
 
-                // Dynamic length solver execution
                 const rawSolution = findOptimalSolution(cube);
                 console.log("Raw Solution:", rawSolution);
 
@@ -595,7 +639,7 @@ async function solveCube() {
                 }
 
                 const rawMoves = rawSolution.trim().split(/\s+/);
-                solutionMoves = simplifyMoves(rawMoves); // Simplify redundant turns
+                solutionMoves = simplifyMoves(rawMoves);
                 currentMoveIndex = 0;
                 updateMoveUI();
                 
