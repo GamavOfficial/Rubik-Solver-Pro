@@ -715,6 +715,16 @@ function rotateSlice(moveStr, callback) {
                 c.position.y = Math.round(c.position.y * 100) / 100;
                 c.position.z = Math.round(c.position.z * 100) / 100;
             });
+            
+            const cell = cubieSize + gap;
+
+targets.forEach(c => {
+
+    c.userData.x = Math.round(c.position.x / cell);
+    c.userData.y = Math.round(c.position.y / cell);
+    c.userData.z = Math.round(c.position.z / cell);
+
+});
 
             scene.remove(pivot);
             if (callback) callback();
