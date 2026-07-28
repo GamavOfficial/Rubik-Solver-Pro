@@ -321,7 +321,7 @@ function onPointerDown(event) {
     }
 
     /* ==========================================
-       ROBUST UNIQUE CENTER COLOR VALIDATION
+       UNIQUE CENTER COLOR VALIDATION
     ========================================== */
     const isCenterSticker = (
         (faceIndex === 0 && x === 1 && y === 0 && z === 0) ||
@@ -343,12 +343,11 @@ function onPointerDown(event) {
         ];
 
         for (const cf of centerFaces) {
-            // Check other centers (excluding current target)
             if (cf.x !== x || cf.y !== y || cf.z !== z) {
                 const otherCenterCubie = getCubieAt(cf.x, cf.y, cf.z);
                 if (otherCenterCubie && otherCenterCubie.userData.painted[cf.face] === appState.selectedColor) {
                     showToast(`Center color '${appState.selectedColor}' already used!`);
-                    return; // Prevent applying duplicate center color
+                    return;
                 }
             }
         }
@@ -533,7 +532,7 @@ function showSolverPage() {
 }
 
 /* ==========================================
-   DYNAMIC MOVE OPTIMIZER & SOLVER ENGINE
+   OPTIMIZED NON-FREEZING SOLVER ENGINE
 ========================================== */
 let isSolvingAnimation = false;
 let solutionMoves = [];
@@ -571,20 +570,6 @@ function simplifyMoves(moves) {
     }).filter(Boolean);
 }
 
-function findOptimalSolution(cube) {
-    for (let depth = 1; depth <= 22; depth++) {
-        try {
-            const sol = cube.solve(depth);
-            if (sol && sol.trim().length > 0) {
-                return sol;
-            }
-        } catch (e) {
-            // Searching next depth
-        }
-    }
-    return cube.solve();
-}
-
 async function solveCube() {
     if (isSolvingAnimation) return;
 
@@ -597,7 +582,6 @@ async function solveCube() {
         const cubeString = getCubeString();
         console.log("Generated String:", cubeString);
 
-        showToast("Calculating Dynamic Solution...");
         showSolverPage();
         isSolvingAnimation = true;
         if (solveBtn) solveBtn.disabled = true;
@@ -607,6 +591,7 @@ async function solveCube() {
         appState.currentFace = 0;
         updateFaceCounter();
 
+        // Async execution to prevent UI freeze
         setTimeout(() => {
             try {
                 const cube = Cube.fromString(cubeString);
@@ -617,7 +602,8 @@ async function solveCube() {
                     return;
                 }
 
-                const rawSolution = findOptimalSolution(cube);
+                // Fast Direct Solve
+                const rawSolution = cube.solve();
                 console.log("Raw Solution:", rawSolution);
 
                 if (!rawSolution || rawSolution.trim() === "") {
@@ -631,14 +617,14 @@ async function solveCube() {
                 currentMoveIndex = 0;
                 updateMoveUI();
                 
-                showToast(`Optimal Solution Found: ${solutionMoves.length} Moves!`);
+                showToast(`Solution Calculated: ${solutionMoves.length} Moves!`);
 
             } catch (solveErr) {
                 console.error("Solve Execution Error:", solveErr);
                 showToast("Invalid Cube Layout! Check sticker arrangement.");
                 resetSolveState();
             }
-        }, 150);
+        }, 100);
 
     } catch (e) {
         console.error("String Build Error:", e.message);
@@ -649,6 +635,11 @@ async function solveCube() {
 
 function updateMoveUI() {
     const total = solutionMoves.length;
+
+    // UI elements update based on screenshot
+    const algoText = document.querySelector(".statistics-algo, #algo-name");
+    const totalMovesLabel = document.querySelector("#total-moves, .total-moves");
+
     if (total === 0) {
         if (currentMoveLabel) currentMoveLabel.textContent = "-";
         if (moveCounterLabel) moveCounterLabel.textContent = "0 / 0";
@@ -657,15 +648,19 @@ function updateMoveUI() {
     }
 
     const activeMove = currentMoveIndex < total ? solutionMoves[currentMoveIndex] : "DONE";
+    
     if (currentMoveLabel) {
         currentMoveLabel.textContent = activeMove;
     }
     if (moveCounterLabel) {
-        moveCounterLabel.textContent = `${currentMoveIndex} / ${total}`;
+        moveCounterLabel.textContent = `Move ${currentMoveIndex + 1} / ${total}`;
     }
     if (moveProgress) {
         moveProgress.max = total;
         moveProgress.value = currentMoveIndex;
+    }
+    if (totalMovesLabel) {
+        totalMovesLabel.textContent = total;
     }
 }
 
