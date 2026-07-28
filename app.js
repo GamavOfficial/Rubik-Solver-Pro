@@ -69,7 +69,6 @@ async function startSplash() {
 
 window.addEventListener("load", () => {
     startSplash();
-    bindPlayerControls();
 });
 
 // Theme System
@@ -150,7 +149,6 @@ const solverViewer = document.getElementById("solver-viewer");
 const currentMoveLabel = document.getElementById("current-move");
 const moveCounterLabel = document.getElementById("move-counter");
 const moveProgress = document.getElementById("move-progress");
-const speedSelect = document.getElementById("animation-speed") || document.querySelector("select");
 
 function updateFaceCounter() {
     const fc = document.getElementById("face-counter");
@@ -305,7 +303,7 @@ function onPointerDown(event) {
 
     const hit = intersects[0];
     const cubie = hit.object;
-    const faceIndex = Math.floor(hit.faceIndex / 2); // Local Material Index 0..5
+    const faceIndex = Math.floor(hit.faceIndex / 2);
 
     const { x, y, z } = cubie.userData;
 
@@ -529,11 +527,10 @@ function showSolverPage() {
     camera.position.set(5, 5, 5);
     camera.lookAt(0, 0, 0);
     renderer.render(scene, camera);
-    bindPlayerControls();
 }
 
 /* ==========================================
-   WEB-WORKER BASED NON-BLOCKING SOLVER
+   WEB-WORKER NON-BLOCKING SOLVER & ANIMATION
 ========================================== */
 let isSolvingAnimation = false;
 let solutionMoves = [];
@@ -572,10 +569,31 @@ function simplifyMoves(moves) {
     }).filter(Boolean);
 }
 
-// Background Worker Solver Execution
+function updateStatisticsUI(totalMoves, algoName, elapsedSec) {
+    // 1. Update Total Moves
+    const totalElems = document.querySelectorAll("#total-moves, .total-moves, [id*='total']");
+    totalElems.forEach(el => { el.textContent = totalMoves; });
+
+    // 2. Update Algorithm Name
+    const algoElems = document.querySelectorAll("#algo-name, #algorithm, .algorithm, .statistics-algo");
+    algoElems.forEach(el => { el.textContent = algoName; });
+
+    const statBoxes = document.querySelectorAll("*");
+    statBoxes.forEach(el => {
+        if (el.children.length === 0 && el.textContent.trim().toLowerCase() === "waiting for solution...") {
+            el.textContent = algoName;
+        }
+    });
+
+    // 3. Update Elapsed Time
+    if (elapsedSec !== undefined) {
+        const timeElems = document.querySelectorAll("#elapsed-time, .elapsed-time");
+        timeElems.forEach(el => { el.textContent = `${elapsedSec} s`; });
+    }
+}
+
 function calculateSolutionNonBlocking(cubeString) {
     return new Promise((resolve, reject) => {
-        // Fallback or Async solve if Web Worker fails
         if (typeof Cube !== 'undefined' && Cube.fromString) {
             setTimeout(() => {
                 try {
@@ -589,9 +607,9 @@ function calculateSolutionNonBlocking(cubeString) {
                 } catch (e) {
                     reject(e);
                 }
-            }, 50);
+            }, 30);
         } else {
-            reject(new Error("Solver library not loaded properly."));
+            reject(new Error("Solver engine missing!"));
         }
     });
 }
@@ -601,7 +619,6 @@ async function solveCube() {
 
     try {
         const cubeString = getCubeString();
-        console.log("Cube String generated:", cubeString);
 
         showSolverPage();
         isSolvingAnimation = true;
@@ -612,25 +629,24 @@ async function solveCube() {
         appState.currentFace = 0;
         updateFaceCounter();
 
-        // Start Elapsed Time Timer
+        // Start Live Timer
         const startTime = performance.now();
-        const elapsedTimeElem = document.querySelector(".statistics-time, #elapsed-time");
         if (elapsedTimeTimer) clearInterval(elapsedTimeTimer);
 
         elapsedTimeTimer = setInterval(() => {
             const sec = ((performance.now() - startTime) / 1000).toFixed(1);
-            if (elapsedTimeElem) elapsedTimeElem.textContent = `${sec} s`;
+            updateStatisticsUI(solutionMoves.length || 0, "Kociemba Two-Phase", sec);
         }, 100);
 
-        // Dynamic Non-blocking Solution Calculation
+        // Calculate Async
         const rawSolution = await calculateSolutionNonBlocking(cubeString);
 
         clearInterval(elapsedTimeTimer);
         const finalSec = ((performance.now() - startTime) / 1000).toFixed(1);
-        if (elapsedTimeElem) elapsedTimeElem.textContent = `${finalSec} s`;
 
         if (!rawSolution || rawSolution.trim() === "") {
             showToast("Cube is already solved!");
+            updateStatisticsUI(0, "Kociemba Two-Phase", finalSec);
             resetSolveState();
             return;
         }
@@ -638,26 +654,23 @@ async function solveCube() {
         const rawMoves = rawSolution.trim().split(/\s+/);
         solutionMoves = simplifyMoves(rawMoves);
         currentMoveIndex = 0;
-        updateMoveUI();
 
-        const algoElem = document.querySelector(".statistics-algo, #algo-name");
-        if (algoElem) algoElem.textContent = "Kociemba Two-Phase";
+        // Sync UI Stats immediately
+        updateStatisticsUI(solutionMoves.length, "Kociemba Two-Phase", finalSec);
+        updateMoveUI();
 
         showToast(`Solution Ready: ${solutionMoves.length} Moves!`);
 
     } catch (e) {
         if (elapsedTimeTimer) clearInterval(elapsedTimeTimer);
         console.error("Solver Error:", e);
-        showToast("Invalid Cube Layout or Unsolvable Configuration!");
+        showToast("Invalid Cube Layout!");
         resetSolveState();
     }
 }
 
 function updateMoveUI() {
     const total = solutionMoves.length;
-
-    const totalMovesLabel = document.querySelector("#total-moves, .total-moves");
-    if (totalMovesLabel) totalMovesLabel.textContent = total;
 
     if (total === 0) {
         if (currentMoveLabel) currentMoveLabel.textContent = "-";
@@ -695,11 +708,12 @@ function getInverseMove(move) {
 }
 
 function getAnimationSpeedDuration() {
+    const speedSelect = document.querySelector("#animation-speed, select");
     if (!speedSelect) return 180;
-    const val = speedSelect.value ? speedSelect.value.toLowerCase() : "";
-    if (val === "fast") return 80;
-    if (val === "slow") return 350;
-    return 180; // Normal speed
+    const val = (speedSelect.value || "").toLowerCase();
+    if (val.includes("fast")) return 80;
+    if (val.includes("slow")) return 350;
+    return 180;
 }
 
 function stepForward(callback) {
@@ -773,7 +787,7 @@ function startAutoPlay() {
         stepForward((success) => {
             if (success && isPlaying && currentMoveIndex < solutionMoves.length) {
                 const speed = getAnimationSpeedDuration();
-                autoPlayTimer = setTimeout(autoStep, speed + 50);
+                autoPlayTimer = setTimeout(autoStep, speed + 60);
             } else {
                 isPlaying = false;
             }
@@ -793,56 +807,40 @@ function pauseAutoPlay() {
 }
 
 /* ==========================================
-   STRICT SINGLE-EVENT CONTROLS
+   UNIVERSAL EVENT DELEGATION FOR PLAYER BUTTONS
 ========================================== */
-function bindPlayerControls() {
-    const prevBtns = document.querySelectorAll("#prev-btn, #previous-btn, .prev-btn, button[title='Previous']");
-    const nextBtns = document.querySelectorAll("#next-btn, .next-btn, button[title='Next']");
-    const playBtns = document.querySelectorAll("#play-btn, .play-btn, button[title='Play']");
-    const pauseBtns = document.querySelectorAll("#pause-btn, .pause-btn, button[title='Pause']");
+document.addEventListener("click", (e) => {
+    const btn = e.target.closest("button, .btn, [role='button']");
+    if (!btn) return;
 
-    prevBtns.forEach(btn => {
-        const newBtn = btn.cloneNode(true);
-        if (btn.parentNode) btn.parentNode.replaceChild(newBtn, btn);
-        newBtn.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            pauseAutoPlay();
-            stepBackward();
-        });
-    });
+    const text = (btn.textContent || "").toLowerCase().trim();
+    const id = (btn.id || "").toLowerCase();
+    const cls = (btn.className || "").toLowerCase();
+    const title = (btn.getAttribute("title") || "").toLowerCase();
 
-    nextBtns.forEach(btn => {
-        const newBtn = btn.cloneNode(true);
-        if (btn.parentNode) btn.parentNode.replaceChild(newBtn, btn);
-        newBtn.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            pauseAutoPlay();
-            stepForward();
-        });
-    });
-
-    playBtns.forEach(btn => {
-        const newBtn = btn.cloneNode(true);
-        if (btn.parentNode) btn.parentNode.replaceChild(newBtn, btn);
-        newBtn.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            startAutoPlay();
-        });
-    });
-
-    pauseBtns.forEach(btn => {
-        const newBtn = btn.cloneNode(true);
-        if (btn.parentNode) btn.parentNode.replaceChild(newBtn, btn);
-        newBtn.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            pauseAutoPlay();
-        });
-    });
-}
+    // PLAY
+    if (id.includes("play") || cls.includes("play") || text.includes("play") || text.includes("▶") || title.includes("play")) {
+        e.preventDefault();
+        startAutoPlay();
+    } 
+    // PAUSE
+    else if (id.includes("pause") || cls.includes("pause") || text.includes("pause") || text.includes("⏸") || title.includes("pause")) {
+        e.preventDefault();
+        pauseAutoPlay();
+    } 
+    // NEXT
+    else if (id.includes("next") || cls.includes("next") || text.includes("next") || text.includes("⏭") || title.includes("next")) {
+        e.preventDefault();
+        pauseAutoPlay();
+        stepForward();
+    } 
+    // PREVIOUS
+    else if (id.includes("prev") || cls.includes("prev") || text.includes("prev") || text.includes("previous") || text.includes("⏮") || title.includes("previous")) {
+        e.preventDefault();
+        pauseAutoPlay();
+        stepBackward();
+    }
+});
 
 /* ==========================================
    3D SLICE ROTATION ENGINE
