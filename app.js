@@ -320,8 +320,10 @@ function onPointerDown(event) {
         return;
     }
 
-    // UNIQUE CENTER COLOR CHECK
-    const isCenter = (
+    /* ==========================================
+       ROBUST UNIQUE CENTER COLOR VALIDATION
+    ========================================== */
+    const isCenterSticker = (
         (faceIndex === 0 && x === 1 && y === 0 && z === 0) ||
         (faceIndex === 1 && x === -1 && y === 0 && z === 0) ||
         (faceIndex === 2 && x === 0 && y === 1 && z === 0) ||
@@ -330,39 +332,25 @@ function onPointerDown(event) {
         (faceIndex === 5 && x === 0 && y === 0 && z === -1)
     );
 
-    if (isCenter) {
-        let usedInOtherCenter = false;
+    if (isCenterSticker) {
+        const centerFaces = [
+            { face: 0, x: 1, y: 0, z: 0 },
+            { face: 1, x: -1, y: 0, z: 0 },
+            { face: 2, x: 0, y: 1, z: 0 },
+            { face: 3, x: 0, y: -1, z: 0 },
+            { face: 4, x: 0, y: 0, z: 1 },
+            { face: 5, x: 0, y: 0, z: -1 }
+        ];
 
-        rubiksCube.children.forEach(otherCubie => {
-            if (!otherCubie.userData || !otherCubie.userData.painted) return;
-            const ox = otherCubie.userData.x;
-            const oy = otherCubie.userData.y;
-            const oz = otherCubie.userData.z;
-
-            // Check if selected color is already present in any OTHER center
-            if (ox === 1 && oy === 0 && oz === 0 && (x !== 1 || y !== 0 || z !== 0)) {
-                if (otherCubie.userData.painted[0] === appState.selectedColor) usedInOtherCenter = true;
+        for (const cf of centerFaces) {
+            // Check other centers (excluding current target)
+            if (cf.x !== x || cf.y !== y || cf.z !== z) {
+                const otherCenterCubie = getCubieAt(cf.x, cf.y, cf.z);
+                if (otherCenterCubie && otherCenterCubie.userData.painted[cf.face] === appState.selectedColor) {
+                    showToast(`Center color '${appState.selectedColor}' already used!`);
+                    return; // Prevent applying duplicate center color
+                }
             }
-            if (ox === -1 && oy === 0 && oz === 0 && (x !== -1 || y !== 0 || z !== 0)) {
-                if (otherCubie.userData.painted[1] === appState.selectedColor) usedInOtherCenter = true;
-            }
-            if (ox === 0 && oy === 1 && oz === 0 && (x !== 0 || y !== 1 || z !== 0)) {
-                if (otherCubie.userData.painted[2] === appState.selectedColor) usedInOtherCenter = true;
-            }
-            if (ox === 0 && oy === -1 && oz === 0 && (x !== 0 || y !== -1 || z !== 0)) {
-                if (otherCubie.userData.painted[3] === appState.selectedColor) usedInOtherCenter = true;
-            }
-            if (ox === 0 && oy === 0 && oz === 1 && (x !== 0 || y !== 0 || z !== 1)) {
-                if (otherCubie.userData.painted[4] === appState.selectedColor) usedInOtherCenter = true;
-            }
-            if (ox === 0 && oy === 0 && oz === -1 && (x !== 0 || y !== 0 || z !== -1)) {
-                if (otherCubie.userData.painted[5] === appState.selectedColor) usedInOtherCenter = true;
-            }
-        });
-
-        if (usedInOtherCenter) {
-            showToast(`Center color '${appState.selectedColor}' already used!`);
-            return;
         }
     }
 
