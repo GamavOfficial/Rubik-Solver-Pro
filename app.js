@@ -69,6 +69,7 @@ async function startSplash() {
 
 window.addEventListener("load", () => {
     startSplash();
+    initControlListeners(); // Ensure button listeners attach on load
 });
 
 // Theme System
@@ -497,13 +498,14 @@ function showSolverPage() {
 }
 
 /* ==========================================
-   PLAYBACK ENGINE & STATE CONTROLLER
+   SOLVER PLAYBACK & CONTROLLER ENGINE
 ========================================== */
 let isSolvingAnimation = false;
 let solutionMoves = [];
-let currentMoveIndex = 0; // Moves applied so far (0 to solutionMoves.length)
+let currentMoveIndex = 0; // Number of moves applied so far
 let isPlaying = false;
-let isTurnAnimating = false; // Prevents overlapping rotations
+let isTurnAnimating = false; // Locks execution during 3D rotation
+let autoPlayTimer = null;
 
 async function solveCube() {
     if (isSolvingAnimation) return;
@@ -551,7 +553,7 @@ async function solveCube() {
                 updateMoveUI();
                 showToast(`Solved in ${solutionMoves.length} moves!`);
 
-                // Auto Play directly on solve
+                // Auto play starts upon solve calculation
                 startAutoPlay();
 
             } catch (solveErr) {
@@ -569,22 +571,23 @@ async function solveCube() {
 }
 
 function updateMoveUI() {
-    if (solutionMoves.length === 0) {
+    const total = solutionMoves.length;
+    if (total === 0) {
         if (currentMoveLabel) currentMoveLabel.textContent = "-";
         if (moveCounterLabel) moveCounterLabel.textContent = "0 / 0";
         if (moveProgress) { moveProgress.max = 1; moveProgress.value = 0; }
         return;
     }
 
-    const activeMoveIndex = Math.min(currentMoveIndex, solutionMoves.length - 1);
+    const activeMove = currentMoveIndex < total ? solutionMoves[currentMoveIndex] : "DONE";
     if (currentMoveLabel) {
-        currentMoveLabel.textContent = solutionMoves[activeMoveIndex] || "-";
+        currentMoveLabel.textContent = activeMove;
     }
     if (moveCounterLabel) {
-        moveCounterLabel.textContent = `${currentMoveIndex} / ${solutionMoves.length}`;
+        moveCounterLabel.textContent = `${currentMoveIndex} / ${total}`;
     }
     if (moveProgress) {
-        moveProgress.max = solutionMoves.length;
+        moveProgress.max = total;
         moveProgress.value = currentMoveIndex;
     }
 }
@@ -604,7 +607,13 @@ function getInverseMove(move) {
 }
 
 function stepForward(callback) {
-    if (isTurnAnimating || currentMoveIndex >= solutionMoves.length) {
+    if (isTurnAnimating) {
+        if (callback) callback(false);
+        return;
+    }
+
+    if (currentMoveIndex >= solutionMoves.length) {
+        isPlaying = false;
         if (callback) callback(false);
         return;
     }
@@ -629,7 +638,12 @@ function stepForward(callback) {
 }
 
 function stepBackward(callback) {
-    if (isTurnAnimating || currentMoveIndex <= 0) {
+    if (isTurnAnimating) {
+        if (callback) callback(false);
+        return;
+    }
+
+    if (currentMoveIndex <= 0) {
         if (callback) callback(false);
         return;
     }
@@ -652,6 +666,7 @@ function startAutoPlay() {
     if (isPlaying || currentMoveIndex >= solutionMoves.length) return;
 
     isPlaying = true;
+    showToast("Playing...");
 
     function autoStep() {
         if (!isPlaying || currentMoveIndex >= solutionMoves.length) {
@@ -661,7 +676,7 @@ function startAutoPlay() {
 
         stepForward((success) => {
             if (success && isPlaying && currentMoveIndex < solutionMoves.length) {
-                setTimeout(autoStep, 180);
+                autoPlayTimer = setTimeout(autoStep, 250);
             } else {
                 isPlaying = false;
             }
@@ -673,31 +688,48 @@ function startAutoPlay() {
 
 function pauseAutoPlay() {
     isPlaying = false;
+    if (autoPlayTimer) {
+        clearTimeout(autoPlayTimer);
+        autoPlayTimer = null;
+    }
     showToast("Paused");
 }
 
-// Attach Control Buttons Events (Multiple Selectors for Safety)
-const prevBtn = document.getElementById("previous-btn") || document.getElementById("prev-btn") || document.querySelector(".btn-prev");
-const playBtn = document.getElementById("play-btn") || document.getElementById("play") || document.querySelector(".btn-play");
-const pauseBtn = document.getElementById("pause-btn") || document.getElementById("pause") || document.querySelector(".btn-pause");
-const nextBtn = document.getElementById("next-btn") || document.getElementById("next") || document.querySelector(".btn-next");
+/* ==========================================
+   4 BUTTON EVENT LISTENERS (PREV, PLAY, PAUSE, NEXT)
+========================================== */
+function initControlListeners() {
+    const attach = (selectors, callback) => {
+        selectors.forEach(sel => {
+            const elements = document.querySelectorAll(sel);
+            elements.forEach(btn => {
+                btn.onclick = (e) => {
+                    e.preventDefault();
+                    callback();
+                };
+            });
+        });
+    };
 
-if (prevBtn) {
-    prevBtn.addEventListener("click", () => stepBackward());
-}
+    // Previous Button
+    attach(["#previous-btn", "#prev-btn", ".btn-prev", "#solver-prev"], () => {
+        stepBackward();
+    });
 
-if (playBtn) {
-    playBtn.addEventListener("click", () => startAutoPlay());
-}
-
-if (pauseBtn) {
-    pauseBtn.addEventListener("click", () => pauseAutoPlay());
-}
-
-if (nextBtn) {
-    nextBtn.addEventListener("click", () => {
-        if (isPlaying) pauseAutoPlay();
+    // Next Button
+    attach(["#next-btn", "#btn-next", ".btn-next", "#solver-next"], () => {
+        pauseAutoPlay();
         stepForward();
+    });
+
+    // Play Button
+    attach(["#play-btn", "#btn-play", ".btn-play", "#play"], () => {
+        startAutoPlay();
+    });
+
+    // Pause Button
+    attach(["#pause-btn", "#btn-pause", ".btn-pause", "#pause"], () => {
+        pauseAutoPlay();
     });
 }
 
@@ -705,6 +737,11 @@ if (nextBtn) {
    3D SLICE ROTATION ENGINE
 ========================================== */
 function rotateSlice(moveStr, callback) {
+    if (!moveStr) {
+        if (callback) callback();
+        return;
+    }
+
     const face = moveStr[0];
     const modifier = moveStr.slice(1);
 
@@ -743,6 +780,9 @@ function rotateSlice(moveStr, callback) {
             layerVal = -(cubieSize + gap);
             baseAngle = Math.PI / 2;
             break;
+        default:
+            if (callback) callback();
+            return;
     }
 
     let angle = baseAngle;
@@ -762,7 +802,7 @@ function rotateSlice(moveStr, callback) {
     targets.forEach(c => pivot.attach(c));
 
     let start = null;
-    const duration = 200;
+    const duration = 200; // Animation speed in ms
 
     function animateTurn(timestamp) {
         if (!start) start = timestamp;
