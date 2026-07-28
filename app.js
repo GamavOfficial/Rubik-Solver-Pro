@@ -3,15 +3,15 @@ import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
 /* ==========================================
-   Rubik Solver Pro - Perfect Real Solver & Controls
+   Rubik Solver Pro - Full Master Engine
 ========================================== */
 
-// Pre-init Kociemba Solver Table
+// Kociemba Solver Initialization
 if (typeof Cube !== 'undefined' && Cube.initSolver) {
     try {
         Cube.initSolver();
     } catch (e) {
-        console.warn("Cube solver pre-init:", e);
+        console.warn("Cube Solver init issue:", e);
     }
 }
 
@@ -50,7 +50,7 @@ async function startSplash() {
     let progress = 0;
     while (progress <= 100) {
         if (loadingProgress) loadingProgress.style.width = progress + "%";
-        await sleep(10);
+        await sleep(15);
         progress++;
     }
 
@@ -303,7 +303,7 @@ function onPointerDown(event) {
 
     const hit = intersects[0];
     const cubie = hit.object;
-    const faceIndex = Math.floor(hit.faceIndex / 2);
+    const faceIndex = Math.floor(hit.faceIndex / 2); // Local Material Index 0..5
 
     const { x, y, z } = cubie.userData;
 
@@ -317,37 +317,6 @@ function onPointerDown(event) {
         (faceIndex === 5 && z !== -1)
     ) {
         return;
-    }
-
-    // Center Color Uniqueness Validation
-    const isCenterSticker = (
-        (faceIndex === 0 && x === 1 && y === 0 && z === 0) ||
-        (faceIndex === 1 && x === -1 && y === 0 && z === 0) ||
-        (faceIndex === 2 && x === 0 && y === 1 && z === 0) ||
-        (faceIndex === 3 && x === 0 && y === -1 && z === 0) ||
-        (faceIndex === 4 && x === 0 && y === 0 && z === 1) ||
-        (faceIndex === 5 && x === 0 && y === 0 && z === -1)
-    );
-
-    if (isCenterSticker) {
-        const centerFaces = [
-            { face: 0, x: 1, y: 0, z: 0 },
-            { face: 1, x: -1, y: 0, z: 0 },
-            { face: 2, x: 0, y: 1, z: 0 },
-            { face: 3, x: 0, y: -1, z: 0 },
-            { face: 4, x: 0, y: 0, z: 1 },
-            { face: 5, x: 0, y: 0, z: -1 }
-        ];
-
-        for (const cf of centerFaces) {
-            if (cf.x !== x || cf.y !== y || cf.z !== z) {
-                const otherCenterCubie = getCubieAt(cf.x, cf.y, cf.z);
-                if (otherCenterCubie && otherCenterCubie.userData.painted[cf.face] === appState.selectedColor) {
-                    showToast(`Center color '${appState.selectedColor}' already used!`);
-                    return;
-                }
-            }
-        }
     }
 
     const previousColor = cubie.userData.painted[faceIndex];
@@ -404,6 +373,9 @@ if (previousFaceBtn) {
 
 window.addEventListener("resize", resizeRenderer);
 
+/* ==========================================
+   DIRECT 3D CUBE STATE READER
+========================================== */
 function getCubieAt(x, y, z) {
     return rubiksCube.children.find(c => 
         c.userData && c.userData.x === x && c.userData.y === y && c.userData.z === z
@@ -411,11 +383,11 @@ function getCubieAt(x, y, z) {
 }
 
 function getFaceColorsFrom3DCube() {
-    rubiksCube.quaternion.set(0, 0, 0, 1);
+    rubiksCube.quaternion.set(0, 0, 0, 1); // Reset view angle to base
 
     const faceColors = { U: [], R: [], F: [], D: [], L: [], B: [] };
 
-    // U Face
+    // U Face (y = 1, Material 2)
     for (let z = -1; z <= 1; z++) {
         for (let x = -1; x <= 1; x++) {
             const c = getCubieAt(x, 1, z);
@@ -423,7 +395,7 @@ function getFaceColorsFrom3DCube() {
         }
     }
 
-    // R Face
+    // R Face (x = 1, Material 0)
     for (let y = 1; y >= -1; y--) {
         for (let z = 1; z >= -1; z--) {
             const c = getCubieAt(1, y, z);
@@ -431,7 +403,7 @@ function getFaceColorsFrom3DCube() {
         }
     }
 
-    // F Face
+    // F Face (z = 1, Material 4)
     for (let y = 1; y >= -1; y--) {
         for (let x = -1; x <= 1; x++) {
             const c = getCubieAt(x, y, 1);
@@ -439,7 +411,7 @@ function getFaceColorsFrom3DCube() {
         }
     }
 
-    // D Face
+    // D Face (y = -1, Material 3)
     for (let z = 1; z >= -1; z--) {
         for (let x = -1; x <= 1; x++) {
             const c = getCubieAt(x, -1, z);
@@ -447,7 +419,7 @@ function getFaceColorsFrom3DCube() {
         }
     }
 
-    // L Face
+    // L Face (x = -1, Material 1)
     for (let y = 1; y >= -1; y--) {
         for (let z = -1; z <= 1; z++) {
             const c = getCubieAt(-1, y, z);
@@ -455,7 +427,7 @@ function getFaceColorsFrom3DCube() {
         }
     }
 
-    // B Face
+    // B Face (z = -1, Material 5)
     for (let y = 1; y >= -1; y--) {
         for (let x = 1; x >= -1; x--) {
             const c = getCubieAt(x, y, -1);
@@ -472,7 +444,7 @@ function getCubeString() {
 
     const centerToFaceMap = {};
     for (const face of faces) {
-        const centerColor = faceColors[face][4];
+        const centerColor = faceColors[face][4]; // Center sticker
         if (!centerColor) {
             throw new Error(`Center color for face ${face} is missing!`);
         }
@@ -525,7 +497,7 @@ function showSolverPage() {
 }
 
 /* ==========================================
-   REAL KOCIEMBA SOLVER & ANIMATION ENGINE
+   SOLVER CONTROLLER & PLAYBACK ENGINE
 ========================================== */
 let isSolvingAnimation = false;
 let solutionMoves = [];
@@ -534,58 +506,21 @@ let isPlaying = false;
 let isTurnAnimating = false;
 let autoPlayTimer = null;
 
-function sanitizeCubeParity(cube) {
-    if (!cube) return;
-    try {
-        if (Array.isArray(cube.co)) {
-            let sumCo = cube.co.reduce((a, b) => a + b, 0);
-            let modCo = sumCo % 3;
-            if (modCo !== 0) cube.co[7] = (cube.co[7] + (3 - modCo)) % 3;
-        }
-        if (Array.isArray(cube.eo)) {
-            let sumEo = cube.eo.reduce((a, b) => a + b, 0);
-            if (sumEo % 2 !== 0) cube.eo[11] = (cube.eo[11] + 1) % 2;
-        }
-        if (Array.isArray(cube.cp) && Array.isArray(cube.ep)) {
-            const getParity = (arr) => {
-                let p = 0;
-                for (let i = 0; i < arr.length; i++) {
-                    for (let j = i + 1; j < arr.length; j++) {
-                        if (arr[i] > arr[j]) p++;
-                    }
-                }
-                return p % 2;
-            };
-            if (getParity(cube.cp) !== getParity(cube.ep)) {
-                let tmp = cube.ep[0];
-                cube.ep[0] = cube.ep[1];
-                cube.ep[1] = tmp;
-            }
-        }
-    } catch (err) {
-        console.warn("Parity sanitize:", err);
-    }
-}
-
-function updateStatisticsUI(totalMoves, algoName, elapsedSec) {
-    const totalElems = document.querySelectorAll("#total-moves, .total-moves");
-    totalElems.forEach(el => { el.textContent = totalMoves; });
-
-    const algoElems = document.querySelectorAll("#algo-name, #algorithm, .algorithm");
-    algoElems.forEach(el => { el.textContent = algoName; });
-
-    const timeElems = document.querySelectorAll("#elapsed-time, .elapsed-time");
-    timeElems.forEach(el => { el.textContent = `${elapsedSec} s`; });
-}
-
-function solveCube() {
+async function solveCube() {
     if (isSolvingAnimation) return;
 
     try {
+        if (typeof Cube === 'undefined') {
+            showToast("Solver library not loaded!");
+            return;
+        }
+
         const cubeString = getCubeString();
+        console.log("Generated Kociemba String:", cubeString);
+
+        showToast("Calculating Solution...");
         showSolverPage();
         isSolvingAnimation = true;
-
         if (solveBtn) solveBtn.disabled = true;
         if (validateBtn) validateBtn.disabled = true;
 
@@ -593,57 +528,49 @@ function solveCube() {
         appState.currentFace = 0;
         updateFaceCounter();
 
-        const startTime = performance.now();
-        let rawSolution = "";
-
-        // Genuine Kociemba Algorithm Solving
-        if (typeof Cube !== 'undefined' && Cube.fromString) {
-            const cubeObj = Cube.fromString(cubeString);
-            if (cubeObj.isSolved()) {
-                showToast("Cube is already solved!");
-                updateStatisticsUI(0, "Kociemba Two-Phase", "0.00");
-                resetSolveState();
-                return;
-            }
-            sanitizeCubeParity(cubeObj);
-            rawSolution = cubeObj.solve();
-        } else {
-            showToast("Solver engine not loaded properly!");
-            resetSolveState();
-            return;
-        }
-
-        const elapsedSec = ((performance.now() - startTime) / 1000).toFixed(2);
-
-        if (!rawSolution) {
-            showToast("No valid solution found!");
-            resetSolveState();
-            return;
-        }
-
-        solutionMoves = rawSolution.trim().split(/\s+/).filter(Boolean);
-        currentMoveIndex = 0;
-
-        updateStatisticsUI(solutionMoves.length, "Kociemba Two-Phase", elapsedSec);
-        updateMoveUI();
-
-        showToast(`Real Solution Found: ${solutionMoves.length} Moves!`);
-
-        // Auto Start
         setTimeout(() => {
-            startAutoPlay();
-        }, 300);
+            try {
+                const cube = Cube.fromString(cubeString);
+
+                if (cube.isSolved()) {
+                    showToast("Cube is already solved!");
+                    resetSolveState();
+                    return;
+                }
+
+                const solution = cube.solve(22);
+                console.log("Solution:", solution);
+
+                if (!solution || solution.trim() === "") {
+                    showToast("Cube is already solved!");
+                    resetSolveState();
+                    return;
+                }
+
+                solutionMoves = solution.trim().split(/\s+/);
+                currentMoveIndex = 0;
+                updateMoveUI();
+                showToast(`Solved in ${solutionMoves.length} moves!`);
+
+                // Auto Play directly on solve
+                startAutoPlay();
+
+            } catch (solveErr) {
+                console.error("Solve Execution Error:", solveErr);
+                showToast("Invalid Cube Layout! Please check sticker colors.");
+                resetSolveState();
+            }
+        }, 150);
 
     } catch (e) {
-        console.error("Solve Error:", e);
-        showToast("Invalid Cube Color Configuration!");
+        console.error("String Build Error:", e.message);
+        showToast(e.message || "Ensure all 54 stickers are filled!");
         resetSolveState();
     }
 }
 
 function updateMoveUI() {
     const total = solutionMoves.length;
-
     if (total === 0) {
         if (currentMoveLabel) currentMoveLabel.textContent = "-";
         if (moveCounterLabel) moveCounterLabel.textContent = "0 / 0";
@@ -651,14 +578,16 @@ function updateMoveUI() {
         return;
     }
 
-    if (currentMoveIndex < total) {
-        if (currentMoveLabel) currentMoveLabel.textContent = solutionMoves[currentMoveIndex];
-        if (moveCounterLabel) moveCounterLabel.textContent = `Move ${currentMoveIndex + 1} / ${total}`;
-        if (moveProgress) { moveProgress.max = total; moveProgress.value = currentMoveIndex + 1; }
-    } else {
-        if (currentMoveLabel) currentMoveLabel.textContent = "SOLVED 🎉";
-        if (moveCounterLabel) moveCounterLabel.textContent = `Move ${total} / ${total}`;
-        if (moveProgress) { moveProgress.max = total; moveProgress.value = total; }
+    const activeMove = currentMoveIndex < total ? solutionMoves[currentMoveIndex] : "DONE";
+    if (currentMoveLabel) {
+        currentMoveLabel.textContent = activeMove;
+    }
+    if (moveCounterLabel) {
+        moveCounterLabel.textContent = `${currentMoveIndex} / ${total}`;
+    }
+    if (moveProgress) {
+        moveProgress.max = total;
+        moveProgress.value = currentMoveIndex;
     }
 }
 
@@ -676,15 +605,6 @@ function getInverseMove(move) {
     return move + "'";
 }
 
-function getAnimationSpeedDuration() {
-    const speedSelect = document.querySelector("#animation-speed, select");
-    if (!speedSelect) return 250;
-    const val = (speedSelect.value || "").toLowerCase();
-    if (val.includes("fast")) return 120;
-    if (val.includes("slow")) return 450;
-    return 250;
-}
-
 function stepForward(callback) {
     if (isTurnAnimating) {
         if (callback) callback(false);
@@ -693,7 +613,6 @@ function stepForward(callback) {
 
     if (currentMoveIndex >= solutionMoves.length) {
         isPlaying = false;
-        updateMoveUI();
         if (callback) callback(false);
         return;
     }
@@ -746,6 +665,7 @@ function startAutoPlay() {
     if (isPlaying || currentMoveIndex >= solutionMoves.length) return;
 
     isPlaying = true;
+    showToast("Playing...");
 
     function autoStep() {
         if (!isPlaying || currentMoveIndex >= solutionMoves.length) {
@@ -755,8 +675,7 @@ function startAutoPlay() {
 
         stepForward((success) => {
             if (success && isPlaying && currentMoveIndex < solutionMoves.length) {
-                const speed = getAnimationSpeedDuration();
-                autoPlayTimer = setTimeout(autoStep, speed + 60);
+                autoPlayTimer = setTimeout(autoStep, 220);
             } else {
                 isPlaying = false;
             }
@@ -776,35 +695,49 @@ function pauseAutoPlay() {
 }
 
 /* ==========================================
-   BUTTON CLICK CONTROLLERS & EVENT BINDING
+   SMART GLOBAL EVENT DELEGATION FOR ALL 4 BUTTONS
 ========================================== */
 document.addEventListener("click", (e) => {
-    const btn = e.target.closest("button, .btn, [role='button']");
+    const btn = e.target.closest("button, a, div, span");
     if (!btn) return;
 
-    const text = (btn.textContent || "").toLowerCase().trim();
     const id = (btn.id || "").toLowerCase();
+    const text = (btn.innerText || btn.textContent || "").toLowerCase().trim();
     const cls = (btn.className || "").toLowerCase();
 
-    if (id.includes("play") || cls.includes("play") || text.includes("play") || text.includes("▶")) {
-        e.preventDefault();
-        startAutoPlay();
-    } else if (id.includes("pause") || cls.includes("pause") || text.includes("pause") || text.includes("⏸")) {
-        e.preventDefault();
-        pauseAutoPlay();
-    } else if (id.includes("next") || cls.includes("next") || text.includes("next") || text.includes("⏭")) {
-        e.preventDefault();
-        pauseAutoPlay();
-        stepForward();
-    } else if (id.includes("prev") || cls.includes("prev") || text.includes("prev") || text.includes("previous") || text.includes("⏮")) {
+    // Check Previous Button
+    if (id.includes("prev") || text.includes("previous") || text.includes("prev") || text.includes("<<") || cls.includes("prev")) {
         e.preventDefault();
         pauseAutoPlay();
         stepBackward();
+        return;
+    }
+
+    // Check Next Button
+    if (id.includes("next") || text.includes("next") || text.includes(">>") || cls.includes("next")) {
+        e.preventDefault();
+        pauseAutoPlay();
+        stepForward();
+        return;
+    }
+
+    // Check Play Button
+    if (id.includes("play") || text.includes("play") || text.includes("▶") || cls.includes("play")) {
+        e.preventDefault();
+        startAutoPlay();
+        return;
+    }
+
+    // Check Pause Button
+    if (id.includes("pause") || text.includes("pause") || text.includes("⏸") || cls.includes("pause")) {
+        e.preventDefault();
+        pauseAutoPlay();
+        return;
     }
 });
 
 /* ==========================================
-   3D ROTATION SLICE ENGINE
+   3D SLICE ROTATION ENGINE
 ========================================== */
 function rotateSlice(moveStr, callback) {
     if (!moveStr) {
@@ -878,7 +811,7 @@ function rotateSlice(moveStr, callback) {
     targets.forEach(c => pivot.attach(c));
 
     let start = null;
-    const duration = getAnimationSpeedDuration();
+    const duration = 180; // Animation speed in ms
 
     function animateTurn(timestamp) {
         if (!start) start = timestamp;
