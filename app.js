@@ -496,12 +496,14 @@ function showSolverPage() {
     renderer.render(scene, camera);
 }
 
+/* ==========================================
+   PLAYBACK ENGINE & STATE CONTROLLER
+========================================== */
 let isSolvingAnimation = false;
 let solutionMoves = [];
-let currentMoveIndex = 0;
-let animationState = "idle";
-
-let currentStep = -1;
+let currentMoveIndex = 0; // Moves applied so far (0 to solutionMoves.length)
+let isPlaying = false;
+let isTurnAnimating = false; // Prevents overlapping rotations
 
 async function solveCube() {
     if (isSolvingAnimation) return;
@@ -544,14 +546,14 @@ async function solveCube() {
                     return;
                 }
 
-                const moves = solution.trim().split(/\s+/);
-                solutionMoves = moves;
-                currentStep = -1;
+                solutionMoves = solution.trim().split(/\s+/);
                 currentMoveIndex = 0;
-                animationState = "playing";
-                showToast(`Solved in ${moves.length} moves! Animating...`);
+                updateMoveUI();
+                showToast(`Solved in ${solutionMoves.length} moves!`);
 
-                playSolutionQueue(moves);
+                // Auto Play directly on solve
+                startAutoPlay();
+
             } catch (solveErr) {
                 console.error("Solve Execution Error:", solveErr);
                 showToast("Invalid Cube Layout! Please check sticker colors.");
@@ -567,95 +569,142 @@ async function solveCube() {
 }
 
 function updateMoveUI() {
+    if (solutionMoves.length === 0) {
+        if (currentMoveLabel) currentMoveLabel.textContent = "-";
+        if (moveCounterLabel) moveCounterLabel.textContent = "0 / 0";
+        if (moveProgress) { moveProgress.max = 1; moveProgress.value = 0; }
+        return;
+    }
+
+    const activeMoveIndex = Math.min(currentMoveIndex, solutionMoves.length - 1);
     if (currentMoveLabel) {
-        currentMoveLabel.textContent = solutionMoves[currentMoveIndex] || "-";
+        currentMoveLabel.textContent = solutionMoves[activeMoveIndex] || "-";
     }
     if (moveCounterLabel) {
-        moveCounterLabel.textContent = `${currentMoveIndex + 1} / ${solutionMoves.length}`;
+        moveCounterLabel.textContent = `${currentMoveIndex} / ${solutionMoves.length}`;
     }
     if (moveProgress) {
-        moveProgress.max = solutionMoves.length || 1;
+        moveProgress.max = solutionMoves.length;
         moveProgress.value = currentMoveIndex;
     }
 }
 
 function resetSolveState() {
     isSolvingAnimation = false;
+    isPlaying = false;
     if (solveBtn) solveBtn.disabled = false;
     if (validateBtn) validateBtn.disabled = false;
 }
 
-function applyMoveInstant(move) {
-    rotateSlice(move, null, true);
+function getInverseMove(move) {
+    if (!move) return "";
+    if (move.endsWith("'")) return move.slice(0, -1);
+    if (move.endsWith("2")) return move;
+    return move + "'";
 }
 
-const previousBtn = document.getElementById("previous-btn");
-const nextBtn = document.getElementById("next-btn");
+function stepForward(callback) {
+    if (isTurnAnimating || currentMoveIndex >= solutionMoves.length) {
+        if (callback) callback(false);
+        return;
+    }
 
-previousBtn?.addEventListener("click", () => {
+    isTurnAnimating = true;
+    const move = solutionMoves[currentMoveIndex];
 
-    if (animationState === "playing") return;
+    rotateSlice(move, () => {
+        currentMoveIndex++;
+        isTurnAnimating = false;
+        updateMoveUI();
 
-    if (currentStep < 0) return;
+        if (currentMoveIndex >= solutionMoves.length) {
+            isPlaying = false;
+            showToast("Cube Solved Successfully! 🎉");
+            appState.cubeSolved = true;
+            resetSolveState();
+        }
 
-    const move = solutionMoves[currentStep];
+        if (callback) callback(true);
+    });
+}
 
-    const inverse =
-        move.endsWith("'")
-            ? move.replace("'", "")
-            : move.endsWith("2")
-            ? move
-            : move + "'";
+function stepBackward(callback) {
+    if (isTurnAnimating || currentMoveIndex <= 0) {
+        if (callback) callback(false);
+        return;
+    }
 
-    applyMoveInstant(inverse);
+    if (isPlaying) pauseAutoPlay();
 
-    currentStep--;
-    currentMoveIndex = Math.max(0, currentStep);
+    isTurnAnimating = true;
+    const lastMove = solutionMoves[currentMoveIndex - 1];
+    const inverseMove = getInverseMove(lastMove);
 
-    updateMoveUI();
-});
+    rotateSlice(inverseMove, () => {
+        currentMoveIndex--;
+        isTurnAnimating = false;
+        updateMoveUI();
+        if (callback) callback(true);
+    });
+}
 
-nextBtn?.addEventListener("click", () => {
+function startAutoPlay() {
+    if (isPlaying || currentMoveIndex >= solutionMoves.length) return;
 
-    if (animationState === "playing") return;
-    if (currentStep >= solutionMoves.length - 1) return;
+    isPlaying = true;
 
-    currentStep++;
-    currentMoveIndex = currentStep;
+    function autoStep() {
+        if (!isPlaying || currentMoveIndex >= solutionMoves.length) {
+            isPlaying = false;
+            return;
+        }
 
-    applyMoveInstant(solutionMoves[currentStep]);
+        stepForward((success) => {
+            if (success && isPlaying && currentMoveIndex < solutionMoves.length) {
+                setTimeout(autoStep, 180);
+            } else {
+                isPlaying = false;
+            }
+        });
+    }
 
-    updateMoveUI();
-});
+    autoStep();
+}
+
+function pauseAutoPlay() {
+    isPlaying = false;
+    showToast("Paused");
+}
+
+// Attach Control Buttons Events (Multiple Selectors for Safety)
+const prevBtn = document.getElementById("previous-btn") || document.getElementById("prev-btn") || document.querySelector(".btn-prev");
+const playBtn = document.getElementById("play-btn") || document.getElementById("play") || document.querySelector(".btn-play");
+const pauseBtn = document.getElementById("pause-btn") || document.getElementById("pause") || document.querySelector(".btn-pause");
+const nextBtn = document.getElementById("next-btn") || document.getElementById("next") || document.querySelector(".btn-next");
+
+if (prevBtn) {
+    prevBtn.addEventListener("click", () => stepBackward());
+}
+
+if (playBtn) {
+    playBtn.addEventListener("click", () => startAutoPlay());
+}
+
+if (pauseBtn) {
+    pauseBtn.addEventListener("click", () => pauseAutoPlay());
+}
+
+if (nextBtn) {
+    nextBtn.addEventListener("click", () => {
+        if (isPlaying) pauseAutoPlay();
+        stepForward();
+    });
+}
 
 /* ==========================================
    3D SLICE ROTATION ENGINE
 ========================================== */
-function playSolutionQueue(moves) {
-    let index = 0;
-
-    function nextMove() {
-        if (index >= moves.length) {
-            animationState = "finished";
-            updateMoveUI();
-            showToast("Cube Solved Successfully! 🎉");
-            resetSolveState();
-            appState.cubeSolved = true;
-            return;
-        }
-
-        const move = moves[index];
-        currentMoveIndex = index;
-        currentStep = index;
-        updateMoveUI();
-        index++;
-        rotateSlice(move, () => setTimeout(nextMove, 180));
-    }
-
-    nextMove();
-}
-
-function rotateSlice(moveStr, callback, instant = false) {
+function rotateSlice(moveStr, callback) {
     const face = moveStr[0];
     const modifier = moveStr.slice(1);
 
@@ -711,33 +760,9 @@ function rotateSlice(moveStr, callback, instant = false) {
     });
 
     targets.forEach(c => pivot.attach(c));
-    
-    if (instant) {
-    pivot.rotation[axis] = angle;
-    pivot.updateMatrixWorld();
-
-    const cell = cubieSize + gap;
-
-    targets.forEach(c => {
-        rubiksCube.attach(c);
-
-        c.position.x = Math.round(c.position.x * 100) / 100;
-        c.position.y = Math.round(c.position.y * 100) / 100;
-        c.position.z = Math.round(c.position.z * 100) / 100;
-
-        c.userData.x = Math.round(c.position.x / cell);
-        c.userData.y = Math.round(c.position.y / cell);
-        c.userData.z = Math.round(c.position.z / cell);
-    });
-
-    rubiksCube.remove(pivot);
-
-    if (callback) callback();
-    return;
-}
 
     let start = null;
-    const duration = instant ? 0 : 200;
+    const duration = 200;
 
     function animateTurn(timestamp) {
         if (!start) start = timestamp;
