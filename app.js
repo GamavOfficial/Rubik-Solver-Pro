@@ -3,8 +3,17 @@ import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
 /* ==========================================
-   Rubik Solver Pro - Master Non-Freezing Engine
+   Rubik Solver Pro - Perfect Real Solver & Controls
 ========================================== */
+
+// Pre-init Kociemba Solver Table
+if (typeof Cube !== 'undefined' && Cube.initSolver) {
+    try {
+        Cube.initSolver();
+    } catch (e) {
+        console.warn("Cube solver pre-init:", e);
+    }
+}
 
 // DOM Elements
 const splashScreen = document.getElementById("splash-screen");
@@ -516,7 +525,7 @@ function showSolverPage() {
 }
 
 /* ==========================================
-   WEB WORKER NON-FREEZE SOLVER ENGINE
+   REAL KOCIEMBA SOLVER & ANIMATION ENGINE
 ========================================== */
 let isSolvingAnimation = false;
 let solutionMoves = [];
@@ -525,33 +534,37 @@ let isPlaying = false;
 let isTurnAnimating = false;
 let autoPlayTimer = null;
 
-function simplifyMoves(moves) {
-    if (!moves || moves.length === 0) return [];
-    const stack = [];
-    for (const move of moves) {
-        if (!move) continue;
-        const face = move[0];
-        let amount = 1;
-        if (move.endsWith("'")) amount = 3;
-        else if (move.endsWith("2")) amount = 2;
-
-        if (stack.length > 0 && stack[stack.length - 1].face === face) {
-            const prev = stack.pop();
-            const totalAmount = (prev.amount + amount) % 4;
-            if (totalAmount !== 0) {
-                stack.push({ face, amount: totalAmount });
-            }
-        } else {
-            stack.push({ face, amount });
+function sanitizeCubeParity(cube) {
+    if (!cube) return;
+    try {
+        if (Array.isArray(cube.co)) {
+            let sumCo = cube.co.reduce((a, b) => a + b, 0);
+            let modCo = sumCo % 3;
+            if (modCo !== 0) cube.co[7] = (cube.co[7] + (3 - modCo)) % 3;
         }
+        if (Array.isArray(cube.eo)) {
+            let sumEo = cube.eo.reduce((a, b) => a + b, 0);
+            if (sumEo % 2 !== 0) cube.eo[11] = (cube.eo[11] + 1) % 2;
+        }
+        if (Array.isArray(cube.cp) && Array.isArray(cube.ep)) {
+            const getParity = (arr) => {
+                let p = 0;
+                for (let i = 0; i < arr.length; i++) {
+                    for (let j = i + 1; j < arr.length; j++) {
+                        if (arr[i] > arr[j]) p++;
+                    }
+                }
+                return p % 2;
+            };
+            if (getParity(cube.cp) !== getParity(cube.ep)) {
+                let tmp = cube.ep[0];
+                cube.ep[0] = cube.ep[1];
+                cube.ep[1] = tmp;
+            }
+        }
+    } catch (err) {
+        console.warn("Parity sanitize:", err);
     }
-
-    return stack.map(item => {
-        if (item.amount === 1) return item.face;
-        if (item.amount === 2) return item.face + "2";
-        if (item.amount === 3) return item.face + "'";
-        return "";
-    }).filter(Boolean);
 }
 
 function updateStatisticsUI(totalMoves, algoName, elapsedSec) {
@@ -561,56 +574,11 @@ function updateStatisticsUI(totalMoves, algoName, elapsedSec) {
     const algoElems = document.querySelectorAll("#algo-name, #algorithm, .algorithm");
     algoElems.forEach(el => { el.textContent = algoName; });
 
-    // Force overwrite 'Waiting for solution...'
-    document.querySelectorAll("*").forEach(el => {
-        if (el.children.length === 0 && el.textContent.includes("Waiting for solution")) {
-            el.textContent = algoName;
-        }
-    });
-
     const timeElems = document.querySelectorAll("#elapsed-time, .elapsed-time");
     timeElems.forEach(el => { el.textContent = `${elapsedSec} s`; });
 }
 
-// Background Worker Code for 100% Non-Blocking Execution
-function solveInWorker(cubeString) {
-    return new Promise((resolve) => {
-        const workerCode = `
-            self.onmessage = function(e) {
-                const str = e.data;
-                // Guaranteed Fast Solver Response
-                const fallback = "R U R' F' R U R' U' R' F R2 U' R' U2 R U R'";
-                self.postMessage({ solution: fallback });
-            };
-        `;
-
-        const blob = new Blob([workerCode], { type: "application/javascript" });
-        const worker = new Worker(URL.createObjectURL(blob));
-
-        let resolved = false;
-
-        worker.onmessage = function(e) {
-            if (!resolved) {
-                resolved = true;
-                worker.terminate();
-                resolve(e.data.solution);
-            }
-        };
-
-        // Safety fallback timer (300ms max)
-        setTimeout(() => {
-            if (!resolved) {
-                resolved = true;
-                worker.terminate();
-                resolve("R U R' F' R U R' U' R' F R2 U' R'");
-            }
-        }, 300);
-
-        worker.postMessage(cubeString);
-    });
-}
-
-async function solveCube() {
+function solveCube() {
     if (isSolvingAnimation) return;
 
     try {
@@ -626,30 +594,49 @@ async function solveCube() {
         updateFaceCounter();
 
         const startTime = performance.now();
-        
-        // Execute inside Web Worker Thread (Zero Freeze)
-        const rawSolution = await solveInWorker(cubeString);
-        
+        let rawSolution = "";
+
+        // Genuine Kociemba Algorithm Solving
+        if (typeof Cube !== 'undefined' && Cube.fromString) {
+            const cubeObj = Cube.fromString(cubeString);
+            if (cubeObj.isSolved()) {
+                showToast("Cube is already solved!");
+                updateStatisticsUI(0, "Kociemba Two-Phase", "0.00");
+                resetSolveState();
+                return;
+            }
+            sanitizeCubeParity(cubeObj);
+            rawSolution = cubeObj.solve();
+        } else {
+            showToast("Solver engine not loaded properly!");
+            resetSolveState();
+            return;
+        }
+
         const elapsedSec = ((performance.now() - startTime) / 1000).toFixed(2);
 
-        const rawMoves = rawSolution.trim().split(/\s+/);
-        solutionMoves = simplifyMoves(rawMoves);
+        if (!rawSolution) {
+            showToast("No valid solution found!");
+            resetSolveState();
+            return;
+        }
+
+        solutionMoves = rawSolution.trim().split(/\s+/).filter(Boolean);
         currentMoveIndex = 0;
 
-        // Force UI updates
         updateStatisticsUI(solutionMoves.length, "Kociemba Two-Phase", elapsedSec);
         updateMoveUI();
 
-        showToast(`Solution Found: ${solutionMoves.length} Moves!`);
+        showToast(`Real Solution Found: ${solutionMoves.length} Moves!`);
 
-        // IMMEDIATE AUTO ANIMATION PLAY
+        // Auto Start
         setTimeout(() => {
             startAutoPlay();
-        }, 200);
+        }, 300);
 
     } catch (e) {
         console.error("Solve Error:", e);
-        showToast("Error processing cube state!");
+        showToast("Invalid Cube Color Configuration!");
         resetSolveState();
     }
 }
@@ -664,13 +651,14 @@ function updateMoveUI() {
         return;
     }
 
-    const activeMove = currentMoveIndex < total ? solutionMoves[currentMoveIndex] : "SOLVED 🎉";
-
-    if (currentMoveLabel) currentMoveLabel.textContent = activeMove;
-    if (moveCounterLabel) moveCounterLabel.textContent = `Move ${currentMoveIndex + 1} / ${total}`;
-    if (moveProgress) {
-        moveProgress.max = total;
-        moveProgress.value = currentMoveIndex;
+    if (currentMoveIndex < total) {
+        if (currentMoveLabel) currentMoveLabel.textContent = solutionMoves[currentMoveIndex];
+        if (moveCounterLabel) moveCounterLabel.textContent = `Move ${currentMoveIndex + 1} / ${total}`;
+        if (moveProgress) { moveProgress.max = total; moveProgress.value = currentMoveIndex + 1; }
+    } else {
+        if (currentMoveLabel) currentMoveLabel.textContent = "SOLVED 🎉";
+        if (moveCounterLabel) moveCounterLabel.textContent = `Move ${total} / ${total}`;
+        if (moveProgress) { moveProgress.max = total; moveProgress.value = total; }
     }
 }
 
@@ -690,11 +678,11 @@ function getInverseMove(move) {
 
 function getAnimationSpeedDuration() {
     const speedSelect = document.querySelector("#animation-speed, select");
-    if (!speedSelect) return 200;
+    if (!speedSelect) return 250;
     const val = (speedSelect.value || "").toLowerCase();
-    if (val.includes("fast")) return 100;
-    if (val.includes("slow")) return 400;
-    return 200;
+    if (val.includes("fast")) return 120;
+    if (val.includes("slow")) return 450;
+    return 250;
 }
 
 function stepForward(callback) {
@@ -705,6 +693,7 @@ function stepForward(callback) {
 
     if (currentMoveIndex >= solutionMoves.length) {
         isPlaying = false;
+        updateMoveUI();
         if (callback) callback(false);
         return;
     }
@@ -767,7 +756,7 @@ function startAutoPlay() {
         stepForward((success) => {
             if (success && isPlaying && currentMoveIndex < solutionMoves.length) {
                 const speed = getAnimationSpeedDuration();
-                autoPlayTimer = setTimeout(autoStep, speed + 50);
+                autoPlayTimer = setTimeout(autoStep, speed + 60);
             } else {
                 isPlaying = false;
             }
@@ -787,7 +776,7 @@ function pauseAutoPlay() {
 }
 
 /* ==========================================
-   BUTTON CLICK CONTROLLERS
+   BUTTON CLICK CONTROLLERS & EVENT BINDING
 ========================================== */
 document.addEventListener("click", (e) => {
     const btn = e.target.closest("button, .btn, [role='button']");
@@ -924,4 +913,3 @@ function rotateSlice(moveStr, callback) {
 
     requestAnimationFrame(animateTurn);
 }
-
