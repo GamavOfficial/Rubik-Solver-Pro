@@ -127,7 +127,6 @@ function isCenterSticker(faceLetter, stickerIndex) {
     return stickerIndex === 4;
 }
 
-
 setActiveColor("white");
 
 colorButtons.forEach(button => {
@@ -174,11 +173,8 @@ const editorPage = document.getElementById("editor-page");
 const solverPage = document.getElementById("solver-page");
 
 const colorPicker = document.getElementById("color-picker");
-
 const progressBox = document.querySelector(".progress-box");
-
 const editorControls = document.querySelector(".editor-controls");
-
 const solverViewer = document.getElementById("solver-viewer");
 
 const currentMoveLabel = document.getElementById("current-move");
@@ -386,32 +382,31 @@ function onPointerDown(event) {
 
     if (previousColor === appState.selectedColor) return;
 
-const stickerIndex = getStickerIndex(cubie, faceLetter);
-    
+    const stickerIndex = getStickerIndex(cubie, faceLetter);
     
     // Center color restriction
-if (isCenterSticker(faceLetter, stickerIndex)) {
+    if (isCenterSticker(faceLetter, stickerIndex)) {
 
-    if (
-        previousColor !== appState.selectedColor &&
-        centerColorLock[appState.selectedColor]
-    ) {
-        showToast(appState.selectedColor + " already assigned to another center.");
-        return;
+        if (
+            previousColor !== appState.selectedColor &&
+            centerColorLock[appState.selectedColor]
+        ) {
+            showToast(appState.selectedColor + " already assigned to another center.");
+            return;
+        }
+
+        if (previousColor) {
+            centerColorLock[previousColor] = false;
+        }
+
+        centerColorLock[appState.selectedColor] = true;
     }
 
-    if (previousColor) {
-        centerColorLock[previousColor] = false;
-    }
+    if (previousColor) colorUsage[previousColor]--;
 
-    centerColorLock[appState.selectedColor] = true;
-}
-
-if (previousColor) colorUsage[previousColor]--;
-
-cubie.userData.painted[faceIndex] = appState.selectedColor;
-colorUsage[appState.selectedColor]++;
-cubie.material[faceIndex].color.setHex(colorMap[appState.selectedColor]);
+    cubie.userData.painted[faceIndex] = appState.selectedColor;
+    colorUsage[appState.selectedColor]++;
+    cubie.material[faceIndex].color.setHex(colorMap[appState.selectedColor]);
     
     // Store exact color name
     cubeState[faceLetter][stickerIndex] = appState.selectedColor;
@@ -533,15 +528,10 @@ function showSolverPage() {
 }
     
 let isSolvingAnimation = false;
-
 let solutionMoves = [];
 let currentMoveIndex = 0;
-
 let animationState = "idle"; 
-// idle | playing | paused | finished
-
 let animationSpeed = 1;
-
 let animationTimer = null;
 
 async function solveCube() {
@@ -590,8 +580,8 @@ async function solveCube() {
 
                 const moves = solution.trim().split(/\s+/);
                 solutionMoves = moves;
-currentMoveIndex = 0;
-animationState = "playing";
+                currentMoveIndex = 0;
+                animationState = "playing";
                 showToast(`Solved in ${moves.length} moves! Animating...`);
 
                 playSolutionQueue(moves);
@@ -635,15 +625,15 @@ function resetSolveState() {
 }
 
 /* ==========================================
-   3D SLICE ROTATION ENGINE
+   3D SLICE ROTATION ENGINE (FIXED)
 ========================================== */
 function playSolutionQueue(moves) {
     let index = 0;
 
     function nextMove() {
         if (index >= moves.length) {
-        animationState = "finished";
-updateMoveUI();
+            animationState = "finished";
+            updateMoveUI();
             showToast("Cube Solved Successfully! 🎉");
             resetSolveState();
             appState.cubeSolved = true;
@@ -651,12 +641,9 @@ updateMoveUI();
         }
 
         const move = moves[index];
-
-currentMoveIndex = index;
-
-updateMoveUI();
-
-index++;
+        currentMoveIndex = index;
+        updateMoveUI();
+        index++;
         rotateSlice(move, () => setTimeout(nextMove, 180));
     }
 
@@ -667,26 +654,53 @@ function rotateSlice(moveStr, callback) {
     const face = moveStr[0];
     const modifier = moveStr.slice(1);
 
-    let angle = -Math.PI / 2;
-    if (modifier === "'") angle = Math.PI / 2;
-    if (modifier === "2") angle = -Math.PI;
-
     let axis = "y";
     let layerVal = cubieSize + gap;
+    let baseAngle = 0;
 
-    if (face === "U") { axis = "y"; layerVal = cubieSize + gap; angle = -angle; }
-    if (face === "D") { axis = "y"; layerVal = -(cubieSize + gap); }
-    if (face === "R") { axis = "x"; layerVal = cubieSize + gap; angle = -angle; }
-    if (face === "L") { axis = "x"; layerVal = -(cubieSize + gap); }
-    if (face === "F") { axis = "z"; layerVal = cubieSize + gap; angle = -angle; }
-    if (face === "B") { axis = "z"; layerVal = -(cubieSize + gap); }
+    switch (face) {
+        case "U":
+            axis = "y";
+            layerVal = cubieSize + gap;
+            baseAngle = Math.PI / 2;
+            break;
+        case "D":
+            axis = "y";
+            layerVal = -(cubieSize + gap);
+            baseAngle = -Math.PI / 2;
+            break;
+        case "R":
+            axis = "x";
+            layerVal = cubieSize + gap;
+            baseAngle = -Math.PI / 2;
+            break;
+        case "L":
+            axis = "x";
+            layerVal = -(cubieSize + gap);
+            baseAngle = Math.PI / 2;
+            break;
+        case "F":
+            axis = "z";
+            layerVal = cubieSize + gap;
+            baseAngle = -Math.PI / 2;
+            break;
+        case "B":
+            axis = "z";
+            layerVal = -(cubieSize + gap);
+            baseAngle = Math.PI / 2;
+            break;
+    }
+
+    let angle = baseAngle;
+    if (modifier === "'") angle = -baseAngle;
+    if (modifier === "2") angle = baseAngle * 2;
 
     const pivot = new THREE.Group();
-    scene.add(pivot);
+    rubiksCube.add(pivot);
 
     const targets = [];
     rubiksCube.children.forEach(cubie => {
-        if (Math.abs(cubie.position[axis] - layerVal) < 0.2) {
+        if (cubie !== pivot && Math.abs(cubie.position[axis] - layerVal) < 0.2) {
             targets.push(cubie);
         }
     });
@@ -709,24 +723,20 @@ function rotateSlice(moveStr, callback) {
             pivot.rotation[axis] = angle;
             pivot.updateMatrixWorld();
 
+            const cell = cubieSize + gap;
+
             targets.forEach(c => {
                 rubiksCube.attach(c);
                 c.position.x = Math.round(c.position.x * 100) / 100;
                 c.position.y = Math.round(c.position.y * 100) / 100;
                 c.position.z = Math.round(c.position.z * 100) / 100;
+
+                c.userData.x = Math.round(c.position.x / cell);
+                c.userData.y = Math.round(c.position.y / cell);
+                c.userData.z = Math.round(c.position.z / cell);
             });
-            
-            const cell = cubieSize + gap;
 
-targets.forEach(c => {
-
-    c.userData.x = Math.round(c.position.x / cell);
-    c.userData.y = Math.round(c.position.y / cell);
-    c.userData.z = Math.round(c.position.z / cell);
-
-});
-
-            scene.remove(pivot);
+            rubiksCube.remove(pivot);
             if (callback) callback();
         }
     }
