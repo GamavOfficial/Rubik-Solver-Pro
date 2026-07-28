@@ -499,7 +499,21 @@ function showSolverPage() {
     if (solverPage) {
         solverPage.classList.remove("hidden");
     }
-    
+
+    if (solverViewer && renderer.domElement.parentNode !== solverViewer) {
+        solverViewer.appendChild(renderer.domElement);
+    }
+
+    camera.aspect = solverViewer.clientWidth / solverViewer.clientHeight;
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(
+        solverViewer.clientWidth,
+        solverViewer.clientHeight
+    );
+
+    renderer.render(scene, camera);
+
 }
     
 let isSolvingAnimation = false;
@@ -653,4 +667,3 @@ function rotateSlice(moveStr, callback) {
 
     requestAnimationFrame(animateTurn);
 }
-
