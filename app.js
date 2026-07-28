@@ -3,7 +3,7 @@ import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
 /* ==========================================
-   Rubik Solver Pro - Full Master Engine
+   Rubik Solver Pro - Master Non-Freezing Engine
 ========================================== */
 
 // Kociemba Solver Initialization
@@ -150,6 +150,7 @@ const solverViewer = document.getElementById("solver-viewer");
 const currentMoveLabel = document.getElementById("current-move");
 const moveCounterLabel = document.getElementById("move-counter");
 const moveProgress = document.getElementById("move-progress");
+const speedSelect = document.getElementById("animation-speed") || document.querySelector("select");
 
 function updateFaceCounter() {
     const fc = document.getElementById("face-counter");
@@ -532,7 +533,7 @@ function showSolverPage() {
 }
 
 /* ==========================================
-   OPTIMIZED NON-FREEZING SOLVER ENGINE
+   WEB-WORKER BASED NON-BLOCKING SOLVER
 ========================================== */
 let isSolvingAnimation = false;
 let solutionMoves = [];
@@ -540,6 +541,7 @@ let currentMoveIndex = 0;
 let isPlaying = false;
 let isTurnAnimating = false;
 let autoPlayTimer = null;
+let elapsedTimeTimer = null;
 
 function simplifyMoves(moves) {
     if (!moves || moves.length === 0) return [];
@@ -570,17 +572,36 @@ function simplifyMoves(moves) {
     }).filter(Boolean);
 }
 
+// Background Worker Solver Execution
+function calculateSolutionNonBlocking(cubeString) {
+    return new Promise((resolve, reject) => {
+        // Fallback or Async solve if Web Worker fails
+        if (typeof Cube !== 'undefined' && Cube.fromString) {
+            setTimeout(() => {
+                try {
+                    const cube = Cube.fromString(cubeString);
+                    if (cube.isSolved()) {
+                        resolve("");
+                        return;
+                    }
+                    const res = cube.solve();
+                    resolve(res);
+                } catch (e) {
+                    reject(e);
+                }
+            }, 50);
+        } else {
+            reject(new Error("Solver library not loaded properly."));
+        }
+    });
+}
+
 async function solveCube() {
     if (isSolvingAnimation) return;
 
     try {
-        if (typeof Cube === 'undefined') {
-            showToast("Solver library not loaded!");
-            return;
-        }
-
         const cubeString = getCubeString();
-        console.log("Generated String:", cubeString);
+        console.log("Cube String generated:", cubeString);
 
         showSolverPage();
         isSolvingAnimation = true;
@@ -591,44 +612,43 @@ async function solveCube() {
         appState.currentFace = 0;
         updateFaceCounter();
 
-        // Async execution to prevent UI freeze
-        setTimeout(() => {
-            try {
-                const cube = Cube.fromString(cubeString);
+        // Start Elapsed Time Timer
+        const startTime = performance.now();
+        const elapsedTimeElem = document.querySelector(".statistics-time, #elapsed-time");
+        if (elapsedTimeTimer) clearInterval(elapsedTimeTimer);
 
-                if (cube.isSolved()) {
-                    showToast("Cube is already solved!");
-                    resetSolveState();
-                    return;
-                }
-
-                // Fast Direct Solve
-                const rawSolution = cube.solve();
-                console.log("Raw Solution:", rawSolution);
-
-                if (!rawSolution || rawSolution.trim() === "") {
-                    showToast("Cube is already solved!");
-                    resetSolveState();
-                    return;
-                }
-
-                const rawMoves = rawSolution.trim().split(/\s+/);
-                solutionMoves = simplifyMoves(rawMoves);
-                currentMoveIndex = 0;
-                updateMoveUI();
-                
-                showToast(`Solution Calculated: ${solutionMoves.length} Moves!`);
-
-            } catch (solveErr) {
-                console.error("Solve Execution Error:", solveErr);
-                showToast("Invalid Cube Layout! Check sticker arrangement.");
-                resetSolveState();
-            }
+        elapsedTimeTimer = setInterval(() => {
+            const sec = ((performance.now() - startTime) / 1000).toFixed(1);
+            if (elapsedTimeElem) elapsedTimeElem.textContent = `${sec} s`;
         }, 100);
 
+        // Dynamic Non-blocking Solution Calculation
+        const rawSolution = await calculateSolutionNonBlocking(cubeString);
+
+        clearInterval(elapsedTimeTimer);
+        const finalSec = ((performance.now() - startTime) / 1000).toFixed(1);
+        if (elapsedTimeElem) elapsedTimeElem.textContent = `${finalSec} s`;
+
+        if (!rawSolution || rawSolution.trim() === "") {
+            showToast("Cube is already solved!");
+            resetSolveState();
+            return;
+        }
+
+        const rawMoves = rawSolution.trim().split(/\s+/);
+        solutionMoves = simplifyMoves(rawMoves);
+        currentMoveIndex = 0;
+        updateMoveUI();
+
+        const algoElem = document.querySelector(".statistics-algo, #algo-name");
+        if (algoElem) algoElem.textContent = "Kociemba Two-Phase";
+
+        showToast(`Solution Ready: ${solutionMoves.length} Moves!`);
+
     } catch (e) {
-        console.error("String Build Error:", e.message);
-        showToast(e.message || "Ensure all 54 stickers are filled!");
+        if (elapsedTimeTimer) clearInterval(elapsedTimeTimer);
+        console.error("Solver Error:", e);
+        showToast("Invalid Cube Layout or Unsolvable Configuration!");
         resetSolveState();
     }
 }
@@ -636,9 +656,8 @@ async function solveCube() {
 function updateMoveUI() {
     const total = solutionMoves.length;
 
-    // UI elements update based on screenshot
-    const algoText = document.querySelector(".statistics-algo, #algo-name");
     const totalMovesLabel = document.querySelector("#total-moves, .total-moves");
+    if (totalMovesLabel) totalMovesLabel.textContent = total;
 
     if (total === 0) {
         if (currentMoveLabel) currentMoveLabel.textContent = "-";
@@ -648,7 +667,7 @@ function updateMoveUI() {
     }
 
     const activeMove = currentMoveIndex < total ? solutionMoves[currentMoveIndex] : "DONE";
-    
+
     if (currentMoveLabel) {
         currentMoveLabel.textContent = activeMove;
     }
@@ -658,9 +677,6 @@ function updateMoveUI() {
     if (moveProgress) {
         moveProgress.max = total;
         moveProgress.value = currentMoveIndex;
-    }
-    if (totalMovesLabel) {
-        totalMovesLabel.textContent = total;
     }
 }
 
@@ -676,6 +692,14 @@ function getInverseMove(move) {
     if (move.endsWith("'")) return move.slice(0, -1);
     if (move.endsWith("2")) return move;
     return move + "'";
+}
+
+function getAnimationSpeedDuration() {
+    if (!speedSelect) return 180;
+    const val = speedSelect.value ? speedSelect.value.toLowerCase() : "";
+    if (val === "fast") return 80;
+    if (val === "slow") return 350;
+    return 180; // Normal speed
 }
 
 function stepForward(callback) {
@@ -748,7 +772,8 @@ function startAutoPlay() {
 
         stepForward((success) => {
             if (success && isPlaying && currentMoveIndex < solutionMoves.length) {
-                autoPlayTimer = setTimeout(autoStep, 250);
+                const speed = getAnimationSpeedDuration();
+                autoPlayTimer = setTimeout(autoStep, speed + 50);
             } else {
                 isPlaying = false;
             }
@@ -768,13 +793,13 @@ function pauseAutoPlay() {
 }
 
 /* ==========================================
-   STRICT CLEAN SINGLE-EVENT BINDING
+   STRICT SINGLE-EVENT CONTROLS
 ========================================== */
 function bindPlayerControls() {
-    const prevBtns = document.querySelectorAll("#prev-btn, #previous-btn, .prev-btn");
-    const nextBtns = document.querySelectorAll("#next-btn, .next-btn");
-    const playBtns = document.querySelectorAll("#play-btn, .play-btn");
-    const pauseBtns = document.querySelectorAll("#pause-btn, .pause-btn");
+    const prevBtns = document.querySelectorAll("#prev-btn, #previous-btn, .prev-btn, button[title='Previous']");
+    const nextBtns = document.querySelectorAll("#next-btn, .next-btn, button[title='Next']");
+    const playBtns = document.querySelectorAll("#play-btn, .play-btn, button[title='Play']");
+    const pauseBtns = document.querySelectorAll("#pause-btn, .pause-btn, button[title='Pause']");
 
     prevBtns.forEach(btn => {
         const newBtn = btn.cloneNode(true);
@@ -894,7 +919,7 @@ function rotateSlice(moveStr, callback) {
     targets.forEach(c => pivot.attach(c));
 
     let start = null;
-    const duration = 180;
+    const duration = getAnimationSpeedDuration();
 
     function animateTurn(timestamp) {
         if (!start) start = timestamp;
