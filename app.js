@@ -695,8 +695,44 @@ function pauseAutoPlay() {
 }
 
 /* ==========================================
-   SMART GLOBAL EVENT DELEGATION FOR ALL 4 BUTTONS
+   ROBUST EXPLICIT DOM BINDINGS FOR PLAY/PAUSE/PREV/NEXT
 ========================================== */
+const playBtn = document.getElementById("play-btn") || document.querySelector(".play-btn") || document.querySelector("[data-action='play']");
+const pauseBtn = document.getElementById("pause-btn") || document.querySelector(".pause-btn") || document.querySelector("[data-action='pause']");
+const nextStepBtn = document.getElementById("next-step-btn") || document.getElementById("next-move") || document.querySelector(".next-btn") || document.querySelector("[data-action='next']");
+const prevStepBtn = document.getElementById("prev-step-btn") || document.getElementById("prev-move") || document.querySelector(".prev-btn") || document.querySelector("[data-action='prev']");
+
+if (playBtn) {
+    playBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        startAutoPlay();
+    });
+}
+
+if (pauseBtn) {
+    pauseBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        pauseAutoPlay();
+    });
+}
+
+if (nextStepBtn) {
+    nextStepBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        pauseAutoPlay();
+        stepForward();
+    });
+}
+
+if (prevStepBtn) {
+    prevStepBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        pauseAutoPlay();
+        stepBackward();
+    });
+}
+
+// Fallback / Supplemental Global Event Delegation for dynamic buttons
 document.addEventListener("click", (e) => {
     const btn = e.target.closest("button, a, div, span");
     if (!btn) return;
@@ -704,6 +740,9 @@ document.addEventListener("click", (e) => {
     const id = (btn.id || "").toLowerCase();
     const text = (btn.innerText || btn.textContent || "").toLowerCase().trim();
     const cls = (btn.className || "").toLowerCase();
+
+    // Avoid double triggering if explicit ID listeners already caught it
+    if (btn === playBtn || btn === pauseBtn || btn === nextStepBtn || btn === prevStepBtn) return;
 
     // Check Previous Button
     if (id.includes("prev") || text.includes("previous") || text.includes("prev") || text.includes("<<") || cls.includes("prev")) {
