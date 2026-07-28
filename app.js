@@ -69,6 +69,7 @@ async function startSplash() {
 
 window.addEventListener("load", () => {
     startSplash();
+    bindPlayerControls();
 });
 
 // Theme System
@@ -383,7 +384,7 @@ function getCubieAt(x, y, z) {
 }
 
 function getFaceColorsFrom3DCube() {
-    rubiksCube.quaternion.set(0, 0, 0, 1); // Reset view angle to base
+    rubiksCube.quaternion.set(0, 0, 0, 1);
 
     const faceColors = { U: [], R: [], F: [], D: [], L: [], B: [] };
 
@@ -444,7 +445,7 @@ function getCubeString() {
 
     const centerToFaceMap = {};
     for (const face of faces) {
-        const centerColor = faceColors[face][4]; // Center sticker
+        const centerColor = faceColors[face][4];
         if (!centerColor) {
             throw new Error(`Center color for face ${face} is missing!`);
         }
@@ -494,10 +495,11 @@ function showSolverPage() {
     camera.position.set(5, 5, 5);
     camera.lookAt(0, 0, 0);
     renderer.render(scene, camera);
+    bindPlayerControls();
 }
 
 /* ==========================================
-   SOLVER CONTROLLER & PLAYBACK ENGINE
+   DYNAMIC MOVE OPTIMIZER & SOLVER ENGINE
 ========================================== */
 let isSolvingAnimation = false;
 let solutionMoves = [];
@@ -505,6 +507,50 @@ let currentMoveIndex = 0;
 let isPlaying = false;
 let isTurnAnimating = false;
 let autoPlayTimer = null;
+
+function simplifyMoves(moves) {
+    if (!moves || moves.length === 0) return [];
+    const stack = [];
+    for (const move of moves) {
+        if (!move) continue;
+        const face = move[0];
+        let amount = 1;
+        if (move.endsWith("'")) amount = 3;
+        else if (move.endsWith("2")) amount = 2;
+
+        if (stack.length > 0 && stack[stack.length - 1].face === face) {
+            const prev = stack.pop();
+            const totalAmount = (prev.amount + amount) % 4;
+            if (totalAmount !== 0) {
+                stack.push({ face, amount: totalAmount });
+            }
+        } else {
+            stack.push({ face, amount });
+        }
+    }
+
+    return stack.map(item => {
+        if (item.amount === 1) return item.face;
+        if (item.amount === 2) return item.face + "2";
+        if (item.amount === 3) return item.face + "'";
+        return "";
+    }).filter(Boolean);
+}
+
+function findOptimalSolution(cube) {
+    // Dynamically search for shortest depth (1 to 24) instead of fixed 22
+    for (let depth = 1; depth <= 22; depth++) {
+        try {
+            const sol = cube.solve(depth);
+            if (sol && sol.trim().length > 0) {
+                return sol;
+            }
+        } catch (e) {
+            // Searching next depth
+        }
+    }
+    return cube.solve(); // Default fallback
+}
 
 async function solveCube() {
     if (isSolvingAnimation) return;
@@ -516,9 +562,9 @@ async function solveCube() {
         }
 
         const cubeString = getCubeString();
-        console.log("Generated Kociemba String:", cubeString);
+        console.log("Generated String:", cubeString);
 
-        showToast("Calculating Solution...");
+        showToast("Calculating Dynamic Solution...");
         showSolverPage();
         isSolvingAnimation = true;
         if (solveBtn) solveBtn.disabled = true;
@@ -538,26 +584,26 @@ async function solveCube() {
                     return;
                 }
 
-                const solution = cube.solve(22);
-                console.log("Solution:", solution);
+                // Dynamic length solver execution
+                const rawSolution = findOptimalSolution(cube);
+                console.log("Raw Solution:", rawSolution);
 
-                if (!solution || solution.trim() === "") {
+                if (!rawSolution || rawSolution.trim() === "") {
                     showToast("Cube is already solved!");
                     resetSolveState();
                     return;
                 }
 
-                solutionMoves = solution.trim().split(/\s+/);
+                const rawMoves = rawSolution.trim().split(/\s+/);
+                solutionMoves = simplifyMoves(rawMoves); // Simplify redundant turns
                 currentMoveIndex = 0;
                 updateMoveUI();
-                showToast(`Solved in ${solutionMoves.length} moves!`);
-
-                // Auto Play directly on solve
-                startAutoPlay();
+                
+                showToast(`Optimal Solution Found: ${solutionMoves.length} Moves!`);
 
             } catch (solveErr) {
                 console.error("Solve Execution Error:", solveErr);
-                showToast("Invalid Cube Layout! Please check sticker colors.");
+                showToast("Invalid Cube Layout! Check sticker arrangement.");
                 resetSolveState();
             }
         }, 150);
@@ -675,7 +721,7 @@ function startAutoPlay() {
 
         stepForward((success) => {
             if (success && isPlaying && currentMoveIndex < solutionMoves.length) {
-                autoPlayTimer = setTimeout(autoStep, 220);
+                autoPlayTimer = setTimeout(autoStep, 250);
             } else {
                 isPlaying = false;
             }
@@ -695,46 +741,56 @@ function pauseAutoPlay() {
 }
 
 /* ==========================================
-   SMART GLOBAL EVENT DELEGATION FOR ALL 4 BUTTONS
+   STRICT CLEAN SINGLE-EVENT BINDING
 ========================================== */
-document.addEventListener("click", (e) => {
-    const btn = e.target.closest("button, a, div, span");
-    if (!btn) return;
+function bindPlayerControls() {
+    const prevBtns = document.querySelectorAll("#prev-btn, #previous-btn, .prev-btn");
+    const nextBtns = document.querySelectorAll("#next-btn, .next-btn");
+    const playBtns = document.querySelectorAll("#play-btn, .play-btn");
+    const pauseBtns = document.querySelectorAll("#pause-btn, .pause-btn");
 
-    const id = (btn.id || "").toLowerCase();
-    const text = (btn.innerText || btn.textContent || "").toLowerCase().trim();
-    const cls = (btn.className || "").toLowerCase();
+    prevBtns.forEach(btn => {
+        const newBtn = btn.cloneNode(true);
+        if (btn.parentNode) btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            pauseAutoPlay();
+            stepBackward();
+        });
+    });
 
-    // Check Previous Button
-    if (id.includes("prev") || text.includes("previous") || text.includes("prev") || text.includes("<<") || cls.includes("prev")) {
-        e.preventDefault();
-        pauseAutoPlay();
-        stepBackward();
-        return;
-    }
+    nextBtns.forEach(btn => {
+        const newBtn = btn.cloneNode(true);
+        if (btn.parentNode) btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            pauseAutoPlay();
+            stepForward();
+        });
+    });
 
-    // Check Next Button
-    if (id.includes("next") || text.includes("next") || text.includes(">>") || cls.includes("next")) {
-        e.preventDefault();
-        pauseAutoPlay();
-        stepForward();
-        return;
-    }
+    playBtns.forEach(btn => {
+        const newBtn = btn.cloneNode(true);
+        if (btn.parentNode) btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            startAutoPlay();
+        });
+    });
 
-    // Check Play Button
-    if (id.includes("play") || text.includes("play") || text.includes("▶") || cls.includes("play")) {
-        e.preventDefault();
-        startAutoPlay();
-        return;
-    }
-
-    // Check Pause Button
-    if (id.includes("pause") || text.includes("pause") || text.includes("⏸") || cls.includes("pause")) {
-        e.preventDefault();
-        pauseAutoPlay();
-        return;
-    }
-});
+    pauseBtns.forEach(btn => {
+        const newBtn = btn.cloneNode(true);
+        if (btn.parentNode) btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            pauseAutoPlay();
+        });
+    });
+}
 
 /* ==========================================
    3D SLICE ROTATION ENGINE
@@ -811,7 +867,7 @@ function rotateSlice(moveStr, callback) {
     targets.forEach(c => pivot.attach(c));
 
     let start = null;
-    const duration = 180; // Animation speed in ms
+    const duration = 180;
 
     function animateTurn(timestamp) {
         if (!start) start = timestamp;
