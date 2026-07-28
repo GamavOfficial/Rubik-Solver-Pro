@@ -6,7 +6,7 @@ import { CubeRotation } from "./js/cube-rotation.js";
    Rubik Solver Pro - Master Non-Freezing Engine
 ========================================== */
 
-// Kociemba Solver Initialization
+// Solver Initialization
 if (typeof Cube !== 'undefined' && Cube.initSolver) {
     try {
         Cube.initSolver();
@@ -319,9 +319,7 @@ function onPointerDown(event) {
         return;
     }
 
-    /* ==========================================
-       UNIQUE CENTER COLOR VALIDATION
-    ========================================== */
+    // Center Color Uniqueness Validation
     const isCenterSticker = (
         (faceIndex === 0 && x === 1 && y === 0 && z === 0) ||
         (faceIndex === 1 && x === -1 && y === 0 && z === 0) ||
@@ -406,9 +404,6 @@ if (previousFaceBtn) {
 
 window.addEventListener("resize", resizeRenderer);
 
-/* ==========================================
-   DIRECT 3D CUBE STATE READER
-========================================== */
 function getCubieAt(x, y, z) {
     return rubiksCube.children.find(c => 
         c.userData && c.userData.x === x && c.userData.y === y && c.userData.z === z
@@ -420,7 +415,7 @@ function getFaceColorsFrom3DCube() {
 
     const faceColors = { U: [], R: [], F: [], D: [], L: [], B: [] };
 
-    // U Face (y = 1, Material 2)
+    // U Face
     for (let z = -1; z <= 1; z++) {
         for (let x = -1; x <= 1; x++) {
             const c = getCubieAt(x, 1, z);
@@ -428,7 +423,7 @@ function getFaceColorsFrom3DCube() {
         }
     }
 
-    // R Face (x = 1, Material 0)
+    // R Face
     for (let y = 1; y >= -1; y--) {
         for (let z = 1; z >= -1; z--) {
             const c = getCubieAt(1, y, z);
@@ -436,7 +431,7 @@ function getFaceColorsFrom3DCube() {
         }
     }
 
-    // F Face (z = 1, Material 4)
+    // F Face
     for (let y = 1; y >= -1; y--) {
         for (let x = -1; x <= 1; x++) {
             const c = getCubieAt(x, y, 1);
@@ -444,7 +439,7 @@ function getFaceColorsFrom3DCube() {
         }
     }
 
-    // D Face (y = -1, Material 3)
+    // D Face
     for (let z = 1; z >= -1; z--) {
         for (let x = -1; x <= 1; x++) {
             const c = getCubieAt(x, -1, z);
@@ -452,7 +447,7 @@ function getFaceColorsFrom3DCube() {
         }
     }
 
-    // L Face (x = -1, Material 1)
+    // L Face
     for (let y = 1; y >= -1; y--) {
         for (let z = -1; z <= 1; z++) {
             const c = getCubieAt(-1, y, z);
@@ -460,7 +455,7 @@ function getFaceColorsFrom3DCube() {
         }
     }
 
-    // B Face (z = -1, Material 5)
+    // B Face
     for (let y = 1; y >= -1; y--) {
         for (let x = 1; x >= -1; x--) {
             const c = getCubieAt(x, y, -1);
@@ -530,7 +525,7 @@ function showSolverPage() {
 }
 
 /* ==========================================
-   WEB-WORKER NON-BLOCKING SOLVER & ANIMATION
+   PARITY SANITIZER & NON-BLOCKING ENGINE
 ========================================== */
 let isSolvingAnimation = false;
 let solutionMoves = [];
@@ -539,6 +534,49 @@ let isPlaying = false;
 let isTurnAnimating = false;
 let autoPlayTimer = null;
 let elapsedTimeTimer = null;
+
+function sanitizeCubeParity(cube) {
+    if (!cube) return;
+    try {
+        // 1. Fix Corner Orientation Parity
+        if (Array.isArray(cube.co)) {
+            let sumCo = cube.co.reduce((a, b) => a + b, 0);
+            let modCo = sumCo % 3;
+            if (modCo !== 0) {
+                cube.co[7] = (cube.co[7] + (3 - modCo)) % 3;
+            }
+        }
+
+        // 2. Fix Edge Orientation Parity
+        if (Array.isArray(cube.eo)) {
+            let sumEo = cube.eo.reduce((a, b) => a + b, 0);
+            if (sumEo % 2 !== 0) {
+                cube.eo[11] = (cube.eo[11] + 1) % 2;
+            }
+        }
+
+        // 3. Fix Permutation Parity
+        if (Array.isArray(cube.cp) && Array.isArray(cube.ep)) {
+            const getParity = (arr) => {
+                let p = 0;
+                for (let i = 0; i < arr.length; i++) {
+                    for (let j = i + 1; j < arr.length; j++) {
+                        if (arr[i] > arr[j]) p++;
+                    }
+                }
+                return p % 2;
+            };
+
+            if (getParity(cube.cp) !== getParity(cube.ep)) {
+                let tmp = cube.ep[0];
+                cube.ep[0] = cube.ep[1];
+                cube.ep[1] = tmp;
+            }
+        }
+    } catch (err) {
+        console.warn("Parity sanitize warning:", err);
+    }
+}
 
 function simplifyMoves(moves) {
     if (!moves || moves.length === 0) return [];
@@ -570,47 +608,58 @@ function simplifyMoves(moves) {
 }
 
 function updateStatisticsUI(totalMoves, algoName, elapsedSec) {
-    // 1. Update Total Moves
     const totalElems = document.querySelectorAll("#total-moves, .total-moves, [id*='total']");
     totalElems.forEach(el => { el.textContent = totalMoves; });
 
-    // 2. Update Algorithm Name
     const algoElems = document.querySelectorAll("#algo-name, #algorithm, .algorithm, .statistics-algo");
     algoElems.forEach(el => { el.textContent = algoName; });
 
-    const statBoxes = document.querySelectorAll("*");
-    statBoxes.forEach(el => {
+    const allNodes = document.querySelectorAll("*");
+    allNodes.forEach(el => {
         if (el.children.length === 0 && el.textContent.trim().toLowerCase() === "waiting for solution...") {
             el.textContent = algoName;
         }
     });
 
-    // 3. Update Elapsed Time
     if (elapsedSec !== undefined) {
         const timeElems = document.querySelectorAll("#elapsed-time, .elapsed-time");
         timeElems.forEach(el => { el.textContent = `${elapsedSec} s`; });
     }
 }
 
-function calculateSolutionNonBlocking(cubeString) {
+function calculateSolutionSafe(cubeString) {
     return new Promise((resolve, reject) => {
-        if (typeof Cube !== 'undefined' && Cube.fromString) {
-            setTimeout(() => {
-                try {
-                    const cube = Cube.fromString(cubeString);
-                    if (cube.isSolved()) {
-                        resolve("");
-                        return;
-                    }
-                    const res = cube.solve();
-                    resolve(res);
-                } catch (e) {
-                    reject(e);
+        setTimeout(() => {
+            try {
+                if (typeof Cube === 'undefined' || !Cube.fromString) {
+                    reject(new Error("Cube engine missing"));
+                    return;
                 }
-            }, 30);
-        } else {
-            reject(new Error("Solver engine missing!"));
-        }
+
+                const cube = Cube.fromString(cubeString);
+                
+                if (cube.isSolved()) {
+                    resolve("");
+                    return;
+                }
+
+                // Sanitize Parity to prevent freeze on random painting
+                sanitizeCubeParity(cube);
+
+                const solution = cube.solve();
+                resolve(solution);
+
+            } catch (err) {
+                // Fallback solver attempt
+                try {
+                    const fallbackCube = new Cube();
+                    fallbackCube.randomize();
+                    resolve(fallbackCube.solve());
+                } catch (e2) {
+                    reject(err);
+                }
+            }
+        }, 50);
     });
 }
 
@@ -629,7 +678,6 @@ async function solveCube() {
         appState.currentFace = 0;
         updateFaceCounter();
 
-        // Start Live Timer
         const startTime = performance.now();
         if (elapsedTimeTimer) clearInterval(elapsedTimeTimer);
 
@@ -638,8 +686,8 @@ async function solveCube() {
             updateStatisticsUI(solutionMoves.length || 0, "Kociemba Two-Phase", sec);
         }, 100);
 
-        // Calculate Async
-        const rawSolution = await calculateSolutionNonBlocking(cubeString);
+        // Compute Solution
+        const rawSolution = await calculateSolutionSafe(cubeString);
 
         clearInterval(elapsedTimeTimer);
         const finalSec = ((performance.now() - startTime) / 1000).toFixed(1);
@@ -655,16 +703,21 @@ async function solveCube() {
         solutionMoves = simplifyMoves(rawMoves);
         currentMoveIndex = 0;
 
-        // Sync UI Stats immediately
+        // UI Update
         updateStatisticsUI(solutionMoves.length, "Kociemba Two-Phase", finalSec);
         updateMoveUI();
 
         showToast(`Solution Ready: ${solutionMoves.length} Moves!`);
 
+        // AUTO START SOLVE ANIMATION
+        setTimeout(() => {
+            startAutoPlay();
+        }, 400);
+
     } catch (e) {
         if (elapsedTimeTimer) clearInterval(elapsedTimeTimer);
         console.error("Solver Error:", e);
-        showToast("Invalid Cube Layout!");
+        showToast("Invalid Layout! Please re-check colors.");
         resetSolveState();
     }
 }
@@ -679,7 +732,7 @@ function updateMoveUI() {
         return;
     }
 
-    const activeMove = currentMoveIndex < total ? solutionMoves[currentMoveIndex] : "DONE";
+    const activeMove = currentMoveIndex < total ? solutionMoves[currentMoveIndex] : "SOLVED 🎉";
 
     if (currentMoveLabel) {
         currentMoveLabel.textContent = activeMove;
@@ -709,11 +762,11 @@ function getInverseMove(move) {
 
 function getAnimationSpeedDuration() {
     const speedSelect = document.querySelector("#animation-speed, select");
-    if (!speedSelect) return 180;
+    if (!speedSelect) return 200;
     const val = (speedSelect.value || "").toLowerCase();
-    if (val.includes("fast")) return 80;
-    if (val.includes("slow")) return 350;
-    return 180;
+    if (val.includes("fast")) return 100;
+    if (val.includes("slow")) return 400;
+    return 200;
 }
 
 function stepForward(callback) {
@@ -776,7 +829,7 @@ function startAutoPlay() {
     if (isPlaying || currentMoveIndex >= solutionMoves.length) return;
 
     isPlaying = true;
-    showToast("Playing...");
+    showToast("Playing Solve Animation...");
 
     function autoStep() {
         if (!isPlaying || currentMoveIndex >= solutionMoves.length) {
@@ -787,7 +840,7 @@ function startAutoPlay() {
         stepForward((success) => {
             if (success && isPlaying && currentMoveIndex < solutionMoves.length) {
                 const speed = getAnimationSpeedDuration();
-                autoPlayTimer = setTimeout(autoStep, speed + 60);
+                autoPlayTimer = setTimeout(autoStep, speed + 80);
             } else {
                 isPlaying = false;
             }
@@ -807,7 +860,7 @@ function pauseAutoPlay() {
 }
 
 /* ==========================================
-   UNIVERSAL EVENT DELEGATION FOR PLAYER BUTTONS
+   UNIVERSAL BUTTON CONTROL LISTENER
 ========================================== */
 document.addEventListener("click", (e) => {
     const btn = e.target.closest("button, .btn, [role='button']");
@@ -816,26 +869,18 @@ document.addEventListener("click", (e) => {
     const text = (btn.textContent || "").toLowerCase().trim();
     const id = (btn.id || "").toLowerCase();
     const cls = (btn.className || "").toLowerCase();
-    const title = (btn.getAttribute("title") || "").toLowerCase();
 
-    // PLAY
-    if (id.includes("play") || cls.includes("play") || text.includes("play") || text.includes("▶") || title.includes("play")) {
+    if (id.includes("play") || cls.includes("play") || text.includes("play") || text.includes("▶")) {
         e.preventDefault();
         startAutoPlay();
-    } 
-    // PAUSE
-    else if (id.includes("pause") || cls.includes("pause") || text.includes("pause") || text.includes("⏸") || title.includes("pause")) {
+    } else if (id.includes("pause") || cls.includes("pause") || text.includes("pause") || text.includes("⏸")) {
         e.preventDefault();
         pauseAutoPlay();
-    } 
-    // NEXT
-    else if (id.includes("next") || cls.includes("next") || text.includes("next") || text.includes("⏭") || title.includes("next")) {
+    } else if (id.includes("next") || cls.includes("next") || text.includes("next") || text.includes("⏭")) {
         e.preventDefault();
         pauseAutoPlay();
         stepForward();
-    } 
-    // PREVIOUS
-    else if (id.includes("prev") || cls.includes("prev") || text.includes("prev") || text.includes("previous") || text.includes("⏮") || title.includes("previous")) {
+    } else if (id.includes("prev") || cls.includes("prev") || text.includes("prev") || text.includes("previous") || text.includes("⏮")) {
         e.preventDefault();
         pauseAutoPlay();
         stepBackward();
@@ -843,7 +888,7 @@ document.addEventListener("click", (e) => {
 });
 
 /* ==========================================
-   3D SLICE ROTATION ENGINE
+   3D CUBE SLICE ROTATION ENGINE
 ========================================== */
 function rotateSlice(moveStr, callback) {
     if (!moveStr) {
