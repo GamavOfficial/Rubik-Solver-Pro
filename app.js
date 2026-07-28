@@ -511,6 +511,9 @@ function showSolverPage() {
         solverViewer.clientWidth,
         solverViewer.clientHeight
     );
+    
+    camera.position.set(5, 5, 5);
+    camera.lookAt(0, 0, 0);
 
     renderer.render(scene, camera);
 
