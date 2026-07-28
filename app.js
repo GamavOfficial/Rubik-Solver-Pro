@@ -3,10 +3,10 @@ import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
 /* ==========================================
-   Rubik Solver Pro - 100% Synced Core Engine
+   Rubik Solver Pro - Full Master Engine
 ========================================== */
 
-// Kociemba Initialization
+// Kociemba Solver Initialization
 if (typeof Cube !== 'undefined' && Cube.initSolver) {
     try {
         Cube.initSolver();
@@ -69,7 +69,6 @@ async function startSplash() {
 
 window.addEventListener("load", () => {
     startSplash();
-    initControlListeners(); // Ensure button listeners attach on load
 });
 
 // Theme System
@@ -498,13 +497,13 @@ function showSolverPage() {
 }
 
 /* ==========================================
-   SOLVER PLAYBACK & CONTROLLER ENGINE
+   SOLVER CONTROLLER & PLAYBACK ENGINE
 ========================================== */
 let isSolvingAnimation = false;
 let solutionMoves = [];
-let currentMoveIndex = 0; // Number of moves applied so far
+let currentMoveIndex = 0;
 let isPlaying = false;
-let isTurnAnimating = false; // Locks execution during 3D rotation
+let isTurnAnimating = false;
 let autoPlayTimer = null;
 
 async function solveCube() {
@@ -553,7 +552,7 @@ async function solveCube() {
                 updateMoveUI();
                 showToast(`Solved in ${solutionMoves.length} moves!`);
 
-                // Auto play starts upon solve calculation
+                // Auto Play directly on solve
                 startAutoPlay();
 
             } catch (solveErr) {
@@ -676,7 +675,7 @@ function startAutoPlay() {
 
         stepForward((success) => {
             if (success && isPlaying && currentMoveIndex < solutionMoves.length) {
-                autoPlayTimer = setTimeout(autoStep, 250);
+                autoPlayTimer = setTimeout(autoStep, 220);
             } else {
                 isPlaying = false;
             }
@@ -696,42 +695,46 @@ function pauseAutoPlay() {
 }
 
 /* ==========================================
-   4 BUTTON EVENT LISTENERS (PREV, PLAY, PAUSE, NEXT)
+   SMART GLOBAL EVENT DELEGATION FOR ALL 4 BUTTONS
 ========================================== */
-function initControlListeners() {
-    const attach = (selectors, callback) => {
-        selectors.forEach(sel => {
-            const elements = document.querySelectorAll(sel);
-            elements.forEach(btn => {
-                btn.onclick = (e) => {
-                    e.preventDefault();
-                    callback();
-                };
-            });
-        });
-    };
+document.addEventListener("click", (e) => {
+    const btn = e.target.closest("button, a, div, span");
+    if (!btn) return;
 
-    // Previous Button
-    attach(["#previous-btn", "#prev-btn", ".btn-prev", "#solver-prev"], () => {
+    const id = (btn.id || "").toLowerCase();
+    const text = (btn.innerText || btn.textContent || "").toLowerCase().trim();
+    const cls = (btn.className || "").toLowerCase();
+
+    // Check Previous Button
+    if (id.includes("prev") || text.includes("previous") || text.includes("prev") || text.includes("<<") || cls.includes("prev")) {
+        e.preventDefault();
+        pauseAutoPlay();
         stepBackward();
-    });
+        return;
+    }
 
-    // Next Button
-    attach(["#next-btn", "#btn-next", ".btn-next", "#solver-next"], () => {
+    // Check Next Button
+    if (id.includes("next") || text.includes("next") || text.includes(">>") || cls.includes("next")) {
+        e.preventDefault();
         pauseAutoPlay();
         stepForward();
-    });
+        return;
+    }
 
-    // Play Button
-    attach(["#play-btn", "#btn-play", ".btn-play", "#play"], () => {
+    // Check Play Button
+    if (id.includes("play") || text.includes("play") || text.includes("▶") || cls.includes("play")) {
+        e.preventDefault();
         startAutoPlay();
-    });
+        return;
+    }
 
-    // Pause Button
-    attach(["#pause-btn", "#btn-pause", ".btn-pause", "#pause"], () => {
+    // Check Pause Button
+    if (id.includes("pause") || text.includes("pause") || text.includes("⏸") || cls.includes("pause")) {
+        e.preventDefault();
         pauseAutoPlay();
-    });
-}
+        return;
+    }
+});
 
 /* ==========================================
    3D SLICE ROTATION ENGINE
@@ -799,10 +802,16 @@ function rotateSlice(moveStr, callback) {
         }
     });
 
+    if (targets.length === 0) {
+        rubiksCube.remove(pivot);
+        if (callback) callback();
+        return;
+    }
+
     targets.forEach(c => pivot.attach(c));
 
     let start = null;
-    const duration = 200; // Animation speed in ms
+    const duration = 180; // Animation speed in ms
 
     function animateTurn(timestamp) {
         if (!start) start = timestamp;
