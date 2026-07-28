@@ -456,10 +456,9 @@ window.addEventListener("resize", resizeRenderer);
 function getCubeString() {
     const faces = ["U", "R", "F", "D", "L", "B"];
     
-    // Dynamic Center Color Map Construction
     const centerToFaceMap = {};
     for (const face of faces) {
-        const centerColor = cubeState[face][4]; // Index 4 is center piece
+        const centerColor = cubeState[face][4];
         if (!centerColor) {
             throw new Error(`Center color for face ${face} is missing!`);
         }
@@ -554,10 +553,13 @@ async function solveCube() {
 
         // Reset View Orientation before starting animation
         rubiksCube.quaternion.set(0, 0, 0, 1);
+        if (cubeRotation) {
+            if (cubeRotation.targetQuaternion) cubeRotation.targetQuaternion.set(0, 0, 0, 1);
+            if (cubeRotation.currentQuaternion) cubeRotation.currentQuaternion.set(0, 0, 0, 1);
+        }
         appState.currentFace = 0;
         updateFaceCounter();
 
-        // Non-blocking asynchronous calculation delay
         setTimeout(() => {
             try {
                 const cube = Cube.fromString(cubeString);
@@ -568,7 +570,6 @@ async function solveCube() {
                     return;
                 }
 
-                // Solve with max 22 moves search depth
                 const solution = cube.solve(22);
                 console.log("Solution:", solution);
 
@@ -625,7 +626,7 @@ function resetSolveState() {
 }
 
 /* ==========================================
-   3D SLICE ROTATION ENGINE (FIXED)
+   3D SLICE ROTATION ENGINE (FULLY FIXED)
 ========================================== */
 function playSolutionQueue(moves) {
     let index = 0;
@@ -662,12 +663,12 @@ function rotateSlice(moveStr, callback) {
         case "U":
             axis = "y";
             layerVal = cubieSize + gap;
-            baseAngle = Math.PI / 2;
+            baseAngle = -Math.PI / 2;
             break;
         case "D":
             axis = "y";
             layerVal = -(cubieSize + gap);
-            baseAngle = -Math.PI / 2;
+            baseAngle = Math.PI / 2;
             break;
         case "R":
             axis = "x";
