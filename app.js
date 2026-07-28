@@ -170,6 +170,17 @@ const solveBtn = document.getElementById("solve-btn");
 const previousFaceBtn = document.getElementById("previous-face");
 const nextFaceBtn = document.getElementById("next-face");
 
+const editorPage = document.getElementById("editor-page");
+const solverPage = document.getElementById("solver-page");
+
+const colorPicker = document.getElementById("color-picker");
+
+const progressBox = document.querySelector(".progress-box");
+
+const editorControls = document.querySelector(".editor-controls");
+
+const solverViewer = document.getElementById("solver-viewer");
+
 function updateFaceCounter() {
     const fc = document.getElementById("face-counter");
     const fp = document.getElementById("face-progress");
@@ -479,6 +490,18 @@ function getCubeString() {
     return kociembaString;
 }
 
+function showSolverPage() {
+
+    if (editorPage) {
+        editorPage.classList.add("hidden");
+    }
+
+    if (solverPage) {
+        solverPage.classList.remove("hidden");
+    }
+    
+}
+    
 let isSolvingAnimation = false;
 
 async function solveCube() {
@@ -494,6 +517,7 @@ async function solveCube() {
         console.log("Generated Kociemba String:", cubeString);
 
         showToast("Calculating Solution...");
+        showSolverPage();
         isSolvingAnimation = true;
         if (solveBtn) solveBtn.disabled = true;
         if (validateBtn) validateBtn.disabled = true;
@@ -629,3 +653,4 @@ function rotateSlice(moveStr, callback) {
 
     requestAnimationFrame(animateTurn);
 }
+
