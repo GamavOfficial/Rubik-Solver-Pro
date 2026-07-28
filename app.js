@@ -453,11 +453,7 @@ if (previousFaceBtn) {
     });
 }
 
-window.addEventListener("resize", () => {
-    camera.aspect = viewer.clientWidth / viewer.clientHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(viewer.clientWidth, viewer.clientHeight);
-});
+window.addEventListener("resize", resizeRenderer);
 
 /* ==========================================
    DYNAMIC CENTER KOCIEMBA CONVERTER
@@ -494,6 +490,25 @@ function getCubeString() {
     return kociembaString;
 }
 
+function resizeRenderer() {
+
+    const activeViewer =
+        solverPage && !solverPage.classList.contains("hidden")
+            ? solverViewer
+            : viewer;
+
+    if (!activeViewer) return;
+
+    camera.aspect = activeViewer.clientWidth / activeViewer.clientHeight;
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(
+        activeViewer.clientWidth,
+        activeViewer.clientHeight
+    );
+
+}
+
 function showSolverPage() {
 
     if (editorPage) {
@@ -508,13 +523,7 @@ function showSolverPage() {
         solverViewer.appendChild(renderer.domElement);
     }
 
-    camera.aspect = solverViewer.clientWidth / solverViewer.clientHeight;
-    camera.updateProjectionMatrix();
-
-    renderer.setSize(
-        solverViewer.clientWidth,
-        solverViewer.clientHeight
-    );
+    resizeRenderer();
     
     camera.position.set(5, 5, 5);
     camera.lookAt(0, 0, 0);
