@@ -181,6 +181,10 @@ const editorControls = document.querySelector(".editor-controls");
 
 const solverViewer = document.getElementById("solver-viewer");
 
+const currentMoveLabel = document.getElementById("current-move");
+const moveCounterLabel = document.getElementById("move-counter");
+const moveProgress = document.getElementById("move-progress");
+
 function updateFaceCounter() {
     const fc = document.getElementById("face-counter");
     const fp = document.getElementById("face-progress");
@@ -521,6 +525,16 @@ function showSolverPage() {
     
 let isSolvingAnimation = false;
 
+let solutionMoves = [];
+let currentMoveIndex = 0;
+
+let animationState = "idle"; 
+// idle | playing | paused | finished
+
+let animationSpeed = 1;
+
+let animationTimer = null;
+
 async function solveCube() {
     if (isSolvingAnimation) return;
 
@@ -566,6 +580,9 @@ async function solveCube() {
                 }
 
                 const moves = solution.trim().split(/\s+/);
+                solutionMoves = moves;
+currentMoveIndex = 0;
+animationState = "playing";
                 showToast(`Solved in ${moves.length} moves! Animating...`);
 
                 playSolutionQueue(moves);
@@ -583,6 +600,25 @@ async function solveCube() {
     }
 }
 
+function updateMoveUI() {
+
+    if (currentMoveLabel) {
+        currentMoveLabel.textContent =
+            solutionMoves[currentMoveIndex] || "-";
+    }
+
+    if (moveCounterLabel) {
+        moveCounterLabel.textContent =
+            `${currentMoveIndex + 1} / ${solutionMoves.length}`;
+    }
+
+    if (moveProgress) {
+        moveProgress.max = solutionMoves.length || 1;
+        moveProgress.value = currentMoveIndex;
+    }
+
+}
+
 function resetSolveState() {
     isSolvingAnimation = false;
     if (solveBtn) solveBtn.disabled = false;
@@ -597,13 +633,21 @@ function playSolutionQueue(moves) {
 
     function nextMove() {
         if (index >= moves.length) {
+        animationState = "finished";
+updateMoveUI();
             showToast("Cube Solved Successfully! 🎉");
             resetSolveState();
             appState.cubeSolved = true;
             return;
         }
 
-        const move = moves[index++];
+        const move = moves[index];
+
+currentMoveIndex = index;
+
+updateMoveUI();
+
+index++;
         rotateSlice(move, () => setTimeout(nextMove, 180));
     }
 
