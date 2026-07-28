@@ -501,6 +501,8 @@ let solutionMoves = [];
 let currentMoveIndex = 0;
 let animationState = "idle";
 
+let currentStep = -1;
+
 async function solveCube() {
     if (isSolvingAnimation) return;
 
@@ -544,6 +546,7 @@ async function solveCube() {
 
                 const moves = solution.trim().split(/\s+/);
                 solutionMoves = moves;
+                currentStep = -1;
                 currentMoveIndex = 0;
                 animationState = "playing";
                 showToast(`Solved in ${moves.length} moves! Animating...`);
@@ -582,6 +585,49 @@ function resetSolveState() {
     if (validateBtn) validateBtn.disabled = false;
 }
 
+function applyMoveInstant(move) {
+    rotateSlice(move, null, true);
+}
+
+const previousBtn = document.getElementById("previous-btn");
+const nextBtn = document.getElementById("next-btn");
+
+previousBtn?.addEventListener("click", () => {
+
+    if (animationState === "playing") return;
+
+    if (currentStep < 0) return;
+
+    const move = solutionMoves[currentStep];
+
+    const inverse =
+        move.endsWith("'")
+            ? move.replace("'", "")
+            : move.endsWith("2")
+            ? move
+            : move + "'";
+
+    applyMoveInstant(inverse);
+
+    currentStep--;
+    currentMoveIndex = Math.max(0, currentStep);
+
+    updateMoveUI();
+});
+
+nextBtn?.addEventListener("click", () => {
+
+    if (animationState === "playing") return;
+    if (currentStep >= solutionMoves.length - 1) return;
+
+    currentStep++;
+    currentMoveIndex = currentStep;
+
+    applyMoveInstant(solutionMoves[currentStep]);
+
+    updateMoveUI();
+});
+
 /* ==========================================
    3D SLICE ROTATION ENGINE
 ========================================== */
@@ -600,6 +646,7 @@ function playSolutionQueue(moves) {
 
         const move = moves[index];
         currentMoveIndex = index;
+        currentStep = index;
         updateMoveUI();
         index++;
         rotateSlice(move, () => setTimeout(nextMove, 180));
@@ -608,7 +655,7 @@ function playSolutionQueue(moves) {
     nextMove();
 }
 
-function rotateSlice(moveStr, callback) {
+function rotateSlice(moveStr, callback, instant = false) {
     const face = moveStr[0];
     const modifier = moveStr.slice(1);
 
@@ -664,9 +711,33 @@ function rotateSlice(moveStr, callback) {
     });
 
     targets.forEach(c => pivot.attach(c));
+    
+    if (instant) {
+    pivot.rotation[axis] = angle;
+    pivot.updateMatrixWorld();
+
+    const cell = cubieSize + gap;
+
+    targets.forEach(c => {
+        rubiksCube.attach(c);
+
+        c.position.x = Math.round(c.position.x * 100) / 100;
+        c.position.y = Math.round(c.position.y * 100) / 100;
+        c.position.z = Math.round(c.position.z * 100) / 100;
+
+        c.userData.x = Math.round(c.position.x / cell);
+        c.userData.y = Math.round(c.position.y / cell);
+        c.userData.z = Math.round(c.position.z / cell);
+    });
+
+    rubiksCube.remove(pivot);
+
+    if (callback) callback();
+    return;
+}
 
     let start = null;
-    const duration = 200;
+    const duration = instant ? 0 : 200;
 
     function animateTurn(timestamp) {
         if (!start) start = timestamp;
