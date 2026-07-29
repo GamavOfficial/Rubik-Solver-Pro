@@ -424,3 +424,27 @@ header button{
     }
 
 }
+
+/* =======================================================
+   Compact Grid Mobile Override
+======================================================= */
+
+@media (max-width:768px){
+
+    .compact-grid{
+        grid-template-columns:repeat(3,70px);
+        gap:18px;
+        justify-content:center;
+    }
+
+    .color-btn{
+        width:70px;
+        height:70px;
+    }
+
+    .color-circle{
+        width:62px;
+        height:62px;
+    }
+
+}
