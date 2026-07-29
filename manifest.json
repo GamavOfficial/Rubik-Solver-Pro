@@ -1,0 +1,17 @@
+{
+  "name": "Rubik Solver Pro",
+  "short_name": "Rubik Solver",
+  "description": "Professional 3D Rubik Cube Solver using Three.js",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "assets/icons/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
