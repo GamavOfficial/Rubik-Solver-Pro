@@ -431,15 +431,17 @@ header button:hover{
 
 .color-grid{
 
-    display:flex;
+    display:grid;
 
-    justify-content:space-between;
+    grid-template-columns:repeat(3,1fr);
 
-    align-items:flex-start;
+    justify-items:center;
 
-    gap:10px;
+    align-items:center;
 
-    margin-top:6px;
+    gap:20px;
+
+    margin-top:12px;
 
 }
 
