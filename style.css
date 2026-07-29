@@ -748,7 +748,7 @@ button:disabled{
 }
 
 /* ==========================================
-   Compact Color Picker (Fixed Shapes & Colors Added)
+   Compact Color Picker (Fully Rounded Circle Buttons with Thickness)
 ========================================== */
 
 .compact-grid{
@@ -770,9 +770,10 @@ button:disabled{
     align-items:center;
     justify-content:center;
     padding:4px;
-    border:none;
-    border-radius:14px;
+    border: none;
+    border-radius: 50%; /* Made the entire button a pure circle shape */
     background:var(--surface-2);
+    box-shadow: inset 0 2px 4px rgba(255,255,255,0.15), 0 4px 8px rgba(0,0,0,0.3); /* Added thickness/depth */
     cursor:pointer;
     transition:.2s ease;
 
@@ -783,8 +784,8 @@ button:disabled{
 }
 
 .color-btn.active{
-    border:2.5px solid #00d4ff;
-    box-shadow:0 0 14px rgba(0, 212, 255, 0.4);
+    border:3px solid #00d4ff;
+    box-shadow:0 0 16px rgba(0, 212, 255, 0.6), inset 0 2px 4px rgba(255,255,255,0.2);
 }
 
 .color-circle{
@@ -792,13 +793,13 @@ button:disabled{
     width:22px;
     height:22px;
     border-radius:50%;
-    border:2px solid rgba(255, 255, 255, 0.8);
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    border:2.5px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.4);
 
 }
 
 /* Explicit Colors for White, Green, Red, Blue, Orange, Yellow */
-.white .color-circle{ background:#ffffff; border-color: #cbd5e1; }
+.white .color-circle{ background:#ffffff; border-color: #94a3b8; }
 .yellow .color-circle{ background:#ffd500; }
 .red .color-circle{ background:#ff2a2a; }
 .orange .color-circle{ background:#ff8800; }
@@ -807,8 +808,8 @@ button:disabled{
 
 .color-count{
 
-    margin-top:4px;
-    font-size:10px;
+    margin-top:2px;
+    font-size:9px;
     font-weight:700;
     color:var(--text);
 
@@ -935,16 +936,16 @@ button:disabled{
     .color-btn{
         width:52px;
         height:52px;
-        border-radius:12px;
+        border-radius:50%; /* Keeps it perfectly round on mobile */
     }
 
     .color-circle{
-        width:20px;
-        height:20px;
+        width:18px;
+        height:18px;
     }
 
     .color-count{
-        font-size:10px;
+        font-size:8px;
     }
 
     #validate-btn, #solve-btn{
