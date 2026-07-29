@@ -294,7 +294,7 @@ header button:hover{
 
     border-radius:20px;
 
-    padding:20px;
+    padding:14px;
 
     box-shadow:var(--shadow);
 
@@ -310,7 +310,7 @@ header button:hover{
 
     font-weight:700;
 
-    margin-bottom:20px;
+    margin-bottom:10px;
 
     letter-spacing:.5px;
 
@@ -422,7 +422,7 @@ header button:hover{
 
     flex-direction:column;
 
-    gap:18px;
+    gap:8px;
 
 }
 
@@ -436,67 +436,14 @@ header button:hover{
 
     gap:10px;
 
-    margin-top:15px;
+    margin-top:6px;
 
 }
 
-.color-btn{
-
-    display:flex;
-
-    align-items:center;
-
-    justify-content:space-between;
-
-    gap:12px;
-
-    padding:14px;
-
-    border-radius:14px;
-
-    background:var(--surface-2);
-
-    color:var(--text);
-
-    border:2px solid transparent;
-
-    transition:var(--transition);
-
-}
-
-.color-btn:hover{
-
-    transform:translateY(-2px);
-
-    border-color:var(--primary);
-
-}
-
-.color-circle{
-
-    width:24px;
-
-    height:24px;
-
-    border-radius:50%;
-
-    border:2px solid #fff;
-
-}
 
 /* ==========================
    Sticker Colors
 ========================== */
-
-.white .color-circle{
-
-    background:#ffffff;
-
-}
-
-.yellow .color-circle{
-    background:#ffd600;
-}
 
 
 /* =======================================================
@@ -884,9 +831,9 @@ button:disabled{
 
     grid-template-columns:repeat(3,1fr);
 
-    gap:12px;
+    gap:6px;
 
-    margin:20px 0;
+    margin:10px 0;
 
 }
 
@@ -902,17 +849,19 @@ button:disabled{
 
     justify-content:center;
 
-    padding:10px;
+    padding:6px;
 
     border:none;
 
-    border-radius:16px;
+    border-radius:12px;
 
     background:#263246;
 
     cursor:pointer;
 
     transition:.25s;
+    
+    min-height:64px;
 
 }
 
@@ -926,8 +875,8 @@ button:disabled{
 }
 
 .color-circle{
-    width:35px;
-    height:35px;
+    width:26px;
+    height:26px;
     border-radius:50%;
     border:3px solid #ffffff;
 }
@@ -958,9 +907,9 @@ button:disabled{
 
 .color-count{
 
-    margin-top:8px;
+    margin-top:4px;
 
-    font-size:13px;
+    font-size:11px;
 
     font-weight:700;
 
@@ -980,7 +929,7 @@ button:disabled{
 
     margin-top:5px;
 
-    margin-bottom:18px;
+    margin-bottom:10px;
 
 }
 
@@ -1023,5 +972,29 @@ button:disabled{
     background:var(--success);
 
     color:#fff;
+
+}
+
+.editor-controls{
+
+    display:flex;
+
+    gap:8px;
+
+    margin-top:8px;
+
+}
+
+.editor-controls button{
+
+    flex:1;
+
+    height:44px;
+
+    border-radius:12px;
+
+    font-size:15px;
+
+    font-weight:600;
 
 }
