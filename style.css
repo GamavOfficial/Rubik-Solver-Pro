@@ -784,66 +784,87 @@ button:disabled{
 ========================================== */
 
 .compact-grid{
-
     display:grid;
-    grid-template-columns:repeat(3, 52px); /* Smaller uniform size */
+    grid-template-columns:repeat(3,80px);
     justify-content:center;
-    gap:14px; /* Better spacing */
-    margin:12px auto;
-
+    gap:20px;
+    margin:18px auto;
 }
 
 .color-btn{
-
-    width:52px;
-    height:52px;
+    width:80px;
+    height:80px;
     display:flex;
-    flex-direction:column;
-    align-items:center;
     justify-content:center;
-    padding:4px;
+    align-items:center;
+    position:relative;
+    background:transparent;
     border:none;
-    border-radius:12px;
-    background:var(--surface-2); /* Using theme variable instead of hex */
     cursor:pointer;
-    transition:.2s ease;
-
+    transition:.25s ease;
 }
 
 .color-btn:hover{
-    transform:translateY(-2px);
-    background: #3c4b63; 
+    transform:scale(1.06);
 }
 
-.color-btn.active{
-    border:2.5px solid #00d4ff;
-    box-shadow:0 0 14px rgba(0, 212, 255, 0.4);
-    background: #253347;
+.color-btn.active .color-circle{
+    box-shadow:
+        0 0 10px #00d4ff,
+        0 0 22px #00d4ff;
 }
 
 .color-circle{
-
-    width:16px;
-    height:16px;
+    width:72px;
+    height:72px;
     border-radius:50%;
-    border:2px solid #ffffff;
-
+    border:4px solid #00d4ff;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-weight:700;
+    font-size:12px;
+    color:#222;
+    box-shadow:
+        0 0 8px rgba(0,212,255,.5);
+    transition:.25s ease;
 }
 
-.white .color-circle{ background:#ffffff; }
-.yellow .color-circle{ background:#ffd500; }
-.red .color-circle{ background:#ff2a2a; }
-.orange .color-circle{ background:#ff8800; }
-.blue .color-circle{ background:#005eff; }
-.green .color-circle{ background:#00b140; }
+.white .color-circle{
+    background:#ffffff;
+    color:#111;
+}
+
+.yellow .color-circle{
+    background:#ffe600;
+    color:#111;
+}
+
+.red .color-circle{
+    background:#ff1d25;
+    color:#fff;
+}
+
+.orange .color-circle{
+    background:#ff8c00;
+    color:#fff;
+}
+
+.blue .color-circle{
+    background:#003cff;
+    color:#fff;
+}
+
+.green .color-circle{
+    background:#0aa83f;
+    color:#fff;
+}
 
 .color-count{
-
-    margin-top:4px;
-    font-size:10px;
+    font-size:11px;
     font-weight:700;
-    color:var(--text);
-
+    color:inherit;
+    pointer-events:none;
 }
 
 /* Action Buttons */
