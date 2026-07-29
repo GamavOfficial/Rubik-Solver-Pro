@@ -243,19 +243,35 @@ header button{
 
 .player-controls{
 
-    grid-template-columns:1fr 1fr;
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
 
     gap:12px;
 
+    margin:20px 0;
+
 }
 
-.player-controls button{
+.player-btn{
 
-    width:100%;
+    width:56px;
 
-    padding:15px;
+    height:56px;
 
-    font-size:1rem;
+    padding:0;
+
+    border-radius:16px;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    font-size:22px;
 
 }
 
@@ -302,6 +318,7 @@ header button{
     font-size:.95rem;
 
 }
+
 
 /* =======================================================
    Algorithm
@@ -357,6 +374,8 @@ header button{
 
 }
 
+}
+
 /* =======================================================
    Small Phones (320px–480px)
 ======================================================= */
@@ -378,15 +397,17 @@ header button{
 
     .player-controls{
 
-        grid-template-columns:1fr;
+        gap:10px;
 
     }
 
-    .color-btn{
+    .player-btn{
 
-        font-size:.9rem;
+        width:50px;
 
-        padding:14px;
+        height:50px;
+
+        font-size:20px;
 
     }
 
@@ -401,7 +422,5 @@ header button{
         font-size:1.8rem;
 
     }
-
-}
 
 }
