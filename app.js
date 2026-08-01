@@ -8,6 +8,8 @@ const cubeEngine = new CubeEngine();
 
 cubeEngine.initialize(viewer);
 
+window.cubeEngine = cubeEngine;
+
 /* ==========================================
    Rubik Solver Pro - Full Master Engine
 ========================================== */
