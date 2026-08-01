@@ -125,12 +125,12 @@ constructor(options = {}) {
     // --------------------------------------------------  
     // Cube Sizing Configuration  
     // --------------------------------------------------  
-    this.size = {  
-        cubie: 0.96,  
-        gap: 1.02,  
-        sticker: 0.84,  
-        stickerOffset: 0.02  
-    };  
+    this.size = {
+    cubie: 0.965,
+    gap: 0.995,
+    sticker: 0.925,
+    stickerOffset: 0.006
+};  
 
     // --------------------------------------------------  
     // Animation Velocity Config  
@@ -204,7 +204,8 @@ initialize(container) {
     // Scene Creation  
     // -----------------------------------------  
     this.scene = new THREE.Scene();  
-    this.scene.background = null;  
+    this.scene.background = null;
+    this.scene.environment = null;  
 
     // -----------------------------------------  
     // Camera Precision Setup  
@@ -212,26 +213,44 @@ initialize(container) {
     const width = container.clientWidth;  
     const height = container.clientHeight;  
 
-    this.camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);  
-    this.camera.position.set(6.5, 5.5, 7.5);  
+    this.camera = new THREE.PerspectiveCamera(32, width / height, 0.1, 100);  
+    this.camera.position.set(6.2, 5.8, 7.2);  
     this.camera.lookAt(0, 0, 0);  
 
     // -----------------------------------------  
     // Production Graphics Renderer  
     // -----------------------------------------  
-    this.renderer = new THREE.WebGLRenderer({  
-        antialias: true,  
-        alpha: true,  
-        powerPreference: "high-performance"  
-    });  
+    this.renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true,
+    powerPreference: "high-performance",
+    stencil: false,
+    depth: true,
+    logarithmicDepthBuffer: false,
+    preserveDrawingBuffer: false
+});  
 
-    this.renderer.setSize(width, height);  
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));  
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;  
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;  
-    this.renderer.toneMappingExposure = 1.15;  
-    this.renderer.shadowMap.enabled = true;  
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;  
+    this.renderer.setSize(width, height);
+
+this.renderer.setPixelRatio(
+    Math.min(window.devicePixelRatio, 1.75)
+);
+
+this.renderer.outputColorSpace =
+    THREE.SRGBColorSpace;
+
+this.renderer.toneMapping =
+    THREE.ACESFilmicToneMapping;
+
+this.renderer.toneMappingExposure = 1.6;
+
+this.renderer.shadowMap.enabled = true;
+
+this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+
+
+  
 
     this.canvas = this.renderer.domElement;  
     container.appendChild(this.canvas);  
@@ -240,7 +259,8 @@ initialize(container) {
     // Hierarchy Root Anchors  
     // -----------------------------------------  
     this.world = new THREE.Group();  
-    this.scene.add(this.world);  
+    this.scene.add(this.world);
+    this.world.rotation.set(-0.35, 0.45, 0);  
 
     this.cubeRoot = new THREE.Group();  
     this.world.add(this.cubeRoot);  
@@ -272,22 +292,24 @@ this.canvas.addEventListener("pointerup", this.pointerUpHandler);
 
 createLights() {  
     // Ambient Light Subsystem  
-    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.45);  
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.60);  
     this.scene.add(this.ambientLight);  
 
     // Directional Primary Sunlight Vector  
-    this.directionLight = new THREE.DirectionalLight(0xffffff, 1.25);  
-    this.directionLight.position.set(5, 8, 6);  
+    this.directionLight = new THREE.DirectionalLight(0xffffff, 1.6);  
+    this.directionLight.position.set(8, 10, 9); 
     this.directionLight.castShadow = true;  
-    this.directionLight.shadow.mapSize.width = 2048;  
-    this.directionLight.shadow.mapSize.height = 2048;  
-    this.directionLight.shadow.camera.near = 0.5;  
+    this.directionLight.shadow.mapSize.width = 4096;
+this.directionLight.shadow.mapSize.height = 4096;  
+    this.directionLight.shadow.camera.near = 0.5;
+      this.directionLight.shadow.bias = -0.00015;
+this.directionLight.shadow.normalBias = 0.02;
     this.directionLight.shadow.camera.far = 30;  
     this.scene.add(this.directionLight);  
 
     // Soft Secondary Chromatic Point Light  
-    this.fillLight = new THREE.PointLight(0x66aaff, 0.35);  
-    this.fillLight.position.set(-6, 4, -5);  
+    this.fillLight = new THREE.PointLight(0x66aaff, 0.55);  
+    this.fillLight.position.set(-8, 6, -7);  
     this.scene.add(this.fillLight);  
 }  
 
@@ -303,7 +325,8 @@ onResize() {
 }  
 
 render() {  
-    if (this.renderer && this.scene && this.camera) {  
+    if (this.renderer && this.scene && this.camera) {
+      
         this.renderer.render(this.scene, this.camera);  
     }  
 }  
@@ -372,31 +395,50 @@ this.canvas?.removeEventListener("pointerup", this.onPointerUp);
 // =====================================================  
 
 createSharedGeometry() {  
-    this.bodyGeometry = new THREE.BoxGeometry(  
-        this.size.cubie,  
-        this.size.cubie,  
-        this.size.cubie  
-    );  
+    this.bodyGeometry = new THREE.BoxGeometry(
+    this.size.cubie,
+    this.size.cubie,
+    this.size.cubie,
+    8,
+    8,
+    8
+);
+
+  this.bodyGeometry.computeVertexNormals();
 
     this.edgeGeometry = new THREE.EdgesGeometry(this.bodyGeometry);  
       
     // செயல்திறனை அதிகரிக்க ஸ்டிக்கர் ஜியோமெட்ரியை இங்கே கேச் செய்கிறோம்  
-    this.stickerGeometry = new THREE.PlaneGeometry(  
-        this.size.sticker,  
-        this.size.sticker  
-    );  
+    this.stickerGeometry = new THREE.PlaneGeometry(
+    this.size.sticker,
+    this.size.sticker,
+    8,
+    8
+);
+
+this.stickerGeometry.computeVertexNormals();  
+
 }  
 
 createSharedMaterials() {  
-    this.bodyMaterial = new THREE.MeshStandardMaterial({  
-        color: this.colors.BODY,  
-        roughness: 0.70,  
-        metalness: 0.10  
-    });  
+    this.bodyMaterial = new THREE.MeshPhysicalMaterial({
+    specularIntensity: 1.0,
+specularColor: 0xffffff,
+    sheen: 0.15,
+    color: this.colors.BODY,
+    roughness: 0.18,
+    metalness: 0.03,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.08,
+    reflectivity: 0.9,
+    ior: 1.5
+});  
 
-    this.edgeMaterial = new THREE.LineBasicMaterial({  
-        color: this.colors.EDGE  
-    });  
+    this.edgeMaterial = new THREE.LineBasicMaterial({
+    color: 0x000000,
+    transparent: true,
+    opacity: 0.22
+});  
 
     // ஒவ்வொரு பக்கத்திற்கும் தேவையான மெட்டீரியல்களை கேச் செய்து மெமரியைச் சேமிக்கிறோம்  
     this.stickerMaterials = {};  
@@ -404,13 +446,20 @@ createSharedMaterials() {
       
     faces.forEach(face => {  
         const color = this.colors[face];  
-        this.stickerMaterials[face] = new THREE.MeshStandardMaterial({  
-            color: color,  
-            roughness: 0.35,  
-            metalness: 0.05,  
-            emissive: color,  
-            emissiveIntensity: 0.18  
-        });  
+        this.stickerMaterials[face] = new THREE.MeshPhysicalMaterial({
+    specularIntensity: 1.0,
+specularColor: 0xffffff,
+    sheen: 0.2,   
+    color: color,
+    roughness: 0.10,
+    metalness: 0.02,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.03,
+    reflectivity: 1.0,
+    ior: 1.5,
+    emissive: color,
+    emissiveIntensity: 0.04
+});  
     });  
 }  
 
@@ -451,7 +500,10 @@ createCubie(x, y, z) {
     );  
 
     mesh.castShadow = true;  
-    mesh.receiveShadow = true;  
+    mesh.receiveShadow = true;
+    mesh.matrixAutoUpdate = true;
+    
+        mesh.frustumCulled = false;
 
     const edges = new THREE.LineSegments(  
         this.edgeGeometry,  
@@ -483,7 +535,9 @@ createStickerGeometry() {
 }  
 
 attachStickers(mesh, x, y, z) {  
-    const offset = this.size.cubie / 2 + this.size.stickerOffset;  
+    const offset = this.size.cubie / 2 + this.size.stickerOffset;
+    
+        
 
     if (x === 1) {  
         this.addSticker(  
@@ -567,7 +621,8 @@ addSticker(
         this.createStickerMaterial(face)  
     );  
 
-    sticker.position.copy(position);  
+    sticker.position.copy(position);
+    sticker.renderOrder = 10; 
     sticker.rotation.copy(rotation);  
 
     sticker.userData = {  
