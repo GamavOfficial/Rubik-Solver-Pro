@@ -2,6 +2,12 @@ import * as THREE from "three";
 import CubeEngine from "./js/cube-engine.js";
 import { CubeRotation } from "./js/cube-rotation.js";
 
+const viewer = document.getElementById("viewer");
+
+const cubeEngine = new CubeEngine();
+
+cubeEngine.initialize(viewer);
+
 /* ==========================================
    Rubik Solver Pro - Full Master Engine
 ========================================== */
