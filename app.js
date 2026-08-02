@@ -480,31 +480,61 @@ const cubieSize = 0.95;
 const gap = 0.05;
 
 // Premium rounded glossy cubie geometry
-function createRoundedCubieGeometry(size, radius = 0.075) {
+function createRoundedCubieGeometry(size, radius = 0.11) {
     const half = size / 2;
 
     const shape = new THREE.Shape();
 
+    // Bottom edge
     shape.moveTo(-half + radius, -half);
     shape.lineTo(half - radius, -half);
-    shape.quadraticCurveTo(half, -half, half, -half + radius);
 
+    // Bottom-right rounded corner
+    shape.quadraticCurveTo(
+        half, -half,
+        half, -half + radius
+    );
+
+    // Right edge
     shape.lineTo(half, half - radius);
-    shape.quadraticCurveTo(half, half, half - radius, half);
 
+    // Top-right rounded corner
+    shape.quadraticCurveTo(
+        half, half,
+        half - radius, half
+    );
+
+    // Top edge
     shape.lineTo(-half + radius, half);
-    shape.quadraticCurveTo(-half, half, -half, half - radius);
 
+    // Top-left rounded corner
+    shape.quadraticCurveTo(
+        -half, half,
+        -half, half - radius
+    );
+
+    // Left edge
     shape.lineTo(-half, -half + radius);
-    shape.quadraticCurveTo(-half, -half, -half + radius, -half);
+
+    // Bottom-left rounded corner
+    shape.quadraticCurveTo(
+        -half, -half,
+        -half + radius, -half
+    );
 
     const geometry = new THREE.ExtrudeGeometry(shape, {
         depth: size,
+
         bevelEnabled: true,
-        bevelThickness: radius,
-        bevelSize: radius,
-        bevelSegments: 5,
-        curveSegments: 8,
+
+        // Deeper premium rounded outer edges
+        bevelThickness: 0.055,
+        bevelSize: 0.055,
+
+        // Smoother curved edges
+        bevelSegments: 8,
+        curveSegments: 12,
+
         steps: 1
     });
 
