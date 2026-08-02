@@ -658,12 +658,28 @@ for (let x = -1; x <= 1; x++) {
     for (let y = -1; y <= 1; y++) {
         for (let z = -1; z <= 1; z++) {
 
-            // Premium rounded black cubie body
-            const bodyMaterial = new THREE.MeshStandardMaterial({
-                color: 0x111111,
-                roughness: 0.18,
-                metalness: 0.08
-            });
+            // Premium piano-black UV coated cubie body
+const bodyMaterial = new THREE.MeshPhysicalMaterial({
+    // Deep black ABS plastic
+    color: 0x050505,
+
+    // Smooth premium plastic
+    roughness: 0.16,
+    metalness: 0.0,
+
+    // Glossy transparent coating
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.075,
+
+    // Studio environment reflections
+    envMapIntensity: 1.35,
+
+    // Plastic surface reflection
+    reflectivity: 0.65,
+
+    // Realistic dielectric plastic
+    ior: 1.48
+});
 
             const cubie = new THREE.Mesh(
                 premiumCubieGeometry,
