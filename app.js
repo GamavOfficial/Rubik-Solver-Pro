@@ -254,6 +254,44 @@ const rubiksCube = new THREE.Group();
 const cubieSize = 0.95;
 const gap = 0.05;
 
+// Premium rounded glossy cubie geometry
+function createRoundedCubieGeometry(size, radius = 0.075) {
+    const half = size / 2;
+
+    const shape = new THREE.Shape();
+
+    shape.moveTo(-half + radius, -half);
+    shape.lineTo(half - radius, -half);
+    shape.quadraticCurveTo(half, -half, half, -half + radius);
+
+    shape.lineTo(half, half - radius);
+    shape.quadraticCurveTo(half, half, half - radius, half);
+
+    shape.lineTo(-half + radius, half);
+    shape.quadraticCurveTo(-half, half, -half, half - radius);
+
+    shape.lineTo(-half, -half + radius);
+    shape.quadraticCurveTo(-half, -half, -half + radius, -half);
+
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: size,
+        bevelEnabled: true,
+        bevelThickness: radius,
+        bevelSize: radius,
+        bevelSegments: 5,
+        curveSegments: 8,
+        steps: 1
+    });
+
+    geometry.center();
+    geometry.computeVertexNormals();
+
+    return geometry;
+}
+
+const premiumCubieGeometry =
+    createRoundedCubieGeometry(cubieSize);
+    
 const colorMap = {
     white: 0xffffff,
     yellow: 0xffff00,
@@ -267,7 +305,7 @@ for (let x = -1; x <= 1; x++) {
     for (let y = -1; y <= 1; y++) {
         for (let z = -1; z <= 1; z++) {
             const materials = Array(6).fill().map(() => new THREE.MeshStandardMaterial({ color: 0x222222 }));
-            const cubie = new THREE.Mesh(new THREE.BoxGeometry(cubieSize, cubieSize, cubieSize), materials);
+            const cubie = new THREE.Mesh(premiumCubieGeometry, materials);
             cubie.position.set(x * (cubieSize + gap), y * (cubieSize + gap), z * (cubieSize + gap));
 
             cubie.userData = {
