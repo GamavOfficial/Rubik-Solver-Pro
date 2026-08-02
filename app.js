@@ -237,17 +237,120 @@ const camera = new THREE.PerspectiveCamera(35, viewer.clientWidth / viewer.clien
 camera.position.set(0, 0, 8);
 camera.lookAt(0, 0, 0);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setSize(viewer.clientWidth, viewer.clientHeight);
-if (viewer) viewer.appendChild(renderer.domElement);
+const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true,
+    powerPreference: "high-performance"
+});
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 2);
+renderer.setPixelRatio(
+    Math.min(window.devicePixelRatio, 2)
+);
+
+renderer.setSize(
+    viewer.clientWidth,
+    viewer.clientHeight
+);
+
+// Premium physically-correct color output
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+// High-end cinematic tone mapping
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+
+// Better transparent/gloss rendering
+renderer.sortObjects = true;
+
+if (viewer) {
+    viewer.appendChild(renderer.domElement);
+}
+
+/* ==========================================
+   PREMIUM PRODUCT STUDIO LIGHTING
+========================================== */
+
+// Soft global illumination
+const ambientLight = new THREE.HemisphereLight(
+    0xffffff,
+    0x182030,
+    1.65
+);
 scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
-directionalLight.position.set(5, 10, 7);
-scene.add(directionalLight);
+
+// ------------------------------------------
+// LARGE TOP-LEFT SOFTBOX
+// Main glossy reflection
+// ------------------------------------------
+const keyLight = new THREE.RectAreaLight(
+    0xffffff,
+    7.5,
+    5.0,
+    5.0
+);
+
+keyLight.position.set(-4.5, 6.0, 5.5);
+keyLight.lookAt(0, 0, 0);
+scene.add(keyLight);
+
+
+// ------------------------------------------
+// RIGHT SOFTBOX
+// Gives side-face reflections
+// ------------------------------------------
+const fillLight = new THREE.RectAreaLight(
+    0xddeeff,
+    5.0,
+    4.0,
+    5.0
+);
+
+fillLight.position.set(5.5, 2.5, 4.0);
+fillLight.lookAt(0, 0, 0);
+scene.add(fillLight);
+
+
+// ------------------------------------------
+// TOP SOFTBOX
+// Highlights upper stickers
+// ------------------------------------------
+const topLight = new THREE.RectAreaLight(
+    0xffffff,
+    5.5,
+    4.5,
+    3.0
+);
+
+topLight.position.set(0, 7, 1);
+topLight.lookAt(0, 0, 0);
+scene.add(topLight);
+
+
+// ------------------------------------------
+// BACK RIM LIGHT
+// Separates black cube from background
+// ------------------------------------------
+const rimLight = new THREE.DirectionalLight(
+    0xbfd8ff,
+    3.0
+);
+
+rimLight.position.set(-4, 4, -6);
+scene.add(rimLight);
+
+
+// ------------------------------------------
+// FRONT BEAUTY LIGHT
+// Keeps sticker colors vivid
+// ------------------------------------------
+const beautyLight = new THREE.DirectionalLight(
+    0xffffff,
+    2.2
+);
+
+beautyLight.position.set(2, 3, 7);
+scene.add(beautyLight);
 
 // Rubik's Cube Mesh Group
 const rubiksCube = new THREE.Group();
@@ -1189,4 +1292,3 @@ function rotateSlice(moveStr, callback) {
 
     requestAnimationFrame(animateTurn);
 }
-
