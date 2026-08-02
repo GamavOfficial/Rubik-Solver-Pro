@@ -352,6 +352,128 @@ const beautyLight = new THREE.DirectionalLight(
 beautyLight.position.set(2, 3, 7);
 scene.add(beautyLight);
 
+/* ==========================================
+   PROCEDURAL STUDIO ENVIRONMENT
+   UV / CLEARCOAT REFLECTION SYSTEM
+========================================== */
+
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+pmremGenerator.compileEquirectangularShader();
+
+const studioScene = new THREE.Scene();
+
+studioScene.background = new THREE.Color(0x080b10);
+
+// Large white studio panels.
+// These become visible as reflections on clearcoat.
+
+function addReflectionPanel(
+    position,
+    scale,
+    intensity = 1
+) {
+    const material = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(
+            intensity,
+            intensity,
+            intensity
+        ),
+        side: THREE.DoubleSide
+    });
+
+    const panel = new THREE.Mesh(
+        new THREE.PlaneGeometry(
+            scale[0],
+            scale[1]
+        ),
+        material
+    );
+
+    panel.position.set(
+        position[0],
+        position[1],
+        position[2]
+    );
+
+    panel.lookAt(0, 0, 0);
+
+    studioScene.add(panel);
+}
+
+
+// ------------------------------------------
+// TOP LARGE SOFTBOX
+// ------------------------------------------
+
+addReflectionPanel(
+    [-2.5, 5.5, 3.0],
+    [5.5, 2.2],
+    3.0
+);
+
+
+// ------------------------------------------
+// LEFT VERTICAL SOFTBOX
+// ------------------------------------------
+
+addReflectionPanel(
+    [-5.0, 1.0, 2.0],
+    [2.0, 5.5],
+    2.2
+);
+
+
+// ------------------------------------------
+// RIGHT VERTICAL SOFTBOX
+// ------------------------------------------
+
+addReflectionPanel(
+    [5.0, 1.5, 1.5],
+    [1.8, 5.0],
+    1.8
+);
+
+
+// ------------------------------------------
+// FRONT STRIP REFLECTION
+// Creates premium long highlight
+// ------------------------------------------
+
+addReflectionPanel(
+    [1.5, 2.5, 6.0],
+    [5.0, 0.65],
+    2.8
+);
+
+
+// ------------------------------------------
+// TOP STRIP
+// ------------------------------------------
+
+addReflectionPanel(
+    [0, 6.0, -1.5],
+    [4.5, 1.0],
+    2.0
+);
+
+
+// Generate filtered environment map
+
+const studioEnvironment =
+    pmremGenerator.fromScene(
+        studioScene,
+        0.04
+    ).texture;
+
+scene.environment = studioEnvironment;
+
+// Reflection rotation
+scene.environmentRotation.set(
+    0,
+    Math.PI * 0.08,
+    0
+);
+
 // Rubik's Cube Mesh Group
 const rubiksCube = new THREE.Group();
 const cubieSize = 0.95;
