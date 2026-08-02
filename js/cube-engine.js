@@ -125,12 +125,23 @@ constructor(options = {}) {
     // --------------------------------------------------  
     // Cube Sizing Configuration  
     // --------------------------------------------------  
-    this.size = {  
-        cubie: 0.96,  
-        gap: 1.02,  
-        sticker: 0.84,  
-        stickerOffset: 0.02  
-    };  
+    this.size = {
+    // Premium speed-cube body
+    cubie: 0.975,
+
+    // Very small professional separation between cubies
+    gap: 1.015,
+
+    // Large face tiles like the reference image
+    sticker: 0.885,
+
+    // Sticker sits slightly above the black body
+    stickerOffset: 0.012,
+
+    // Rounded-corner configuration
+    cubieRadius: 0.075,
+    stickerRadius: 0.105
+};  
 
     // --------------------------------------------------  
     // Animation Velocity Config  
@@ -270,25 +281,55 @@ this.canvas.addEventListener("pointerup", this.pointerUpHandler);
     this.animate();  
 }  
 
-createLights() {  
-    // Ambient Light Subsystem  
-    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.45);  
-    this.scene.add(this.ambientLight);  
+createLights() {
 
-    // Directional Primary Sunlight Vector  
-    this.directionLight = new THREE.DirectionalLight(0xffffff, 1.25);  
-    this.directionLight.position.set(5, 8, 6);  
-    this.directionLight.castShadow = true;  
-    this.directionLight.shadow.mapSize.width = 2048;  
-    this.directionLight.shadow.mapSize.height = 2048;  
-    this.directionLight.shadow.camera.near = 0.5;  
-    this.directionLight.shadow.camera.far = 30;  
-    this.scene.add(this.directionLight);  
+    // Soft studio ambient lighting
+    this.ambientLight =
+        new THREE.AmbientLight(0xffffff, 0.75);
 
-    // Soft Secondary Chromatic Point Light  
-    this.fillLight = new THREE.PointLight(0x66aaff, 0.35);  
-    this.fillLight.position.set(-6, 4, -5);  
-    this.scene.add(this.fillLight);  
+    this.scene.add(this.ambientLight);
+
+
+    // Main premium highlight
+    this.directionLight =
+        new THREE.DirectionalLight(0xffffff, 2.2);
+
+    this.directionLight.position.set(6, 9, 8);
+    this.directionLight.castShadow = true;
+
+    this.directionLight.shadow.mapSize.width = 2048;
+    this.directionLight.shadow.mapSize.height = 2048;
+    this.directionLight.shadow.camera.near = 0.5;
+    this.directionLight.shadow.camera.far = 30;
+
+    this.scene.add(this.directionLight);
+
+
+    // Cool side reflection
+    this.fillLight =
+        new THREE.PointLight(0x9fc5ff, 1.2);
+
+    this.fillLight.position.set(-5, 4, 6);
+
+    this.scene.add(this.fillLight);
+
+
+    // Top UV-coat highlight
+    const topLight =
+        new THREE.PointLight(0xffffff, 1.5);
+
+    topLight.position.set(0, 8, 3);
+
+    this.scene.add(topLight);
+
+
+    // Front soft glossy reflection
+    const frontLight =
+        new THREE.PointLight(0xffffff, 1.0);
+
+    frontLight.position.set(3, 2, 8);
+
+    this.scene.add(frontLight);
 }  
 
 onResize() {  
@@ -371,47 +412,116 @@ this.canvas?.removeEventListener("pointerup", this.onPointerUp);
 // Cube Builder  
 // =====================================================  
 
-createSharedGeometry() {  
-    this.bodyGeometry = new THREE.BoxGeometry(  
-        this.size.cubie,  
-        this.size.cubie,  
-        this.size.cubie  
-    );  
+createSharedGeometry() {
 
-    this.edgeGeometry = new THREE.EdgesGeometry(this.bodyGeometry);  
-      
-    // செயல்திறனை அதிகரிக்க ஸ்டிக்கர் ஜியோமெட்ரியை இங்கே கேச் செய்கிறோம்  
-    this.stickerGeometry = new THREE.PlaneGeometry(  
-        this.size.sticker,  
-        this.size.sticker  
-    );  
+    // Rounded premium cubie body
+    const shape = new THREE.Shape();
+    const s = this.size.cubie / 2;
+    const r = this.size.cubieRadius;
+
+    shape.moveTo(-s + r, -s);
+    shape.lineTo(s - r, -s);
+    shape.quadraticCurveTo(s, -s, s, -s + r);
+    shape.lineTo(s, s - r);
+    shape.quadraticCurveTo(s, s, s - r, s);
+    shape.lineTo(-s + r, s);
+    shape.quadraticCurveTo(-s, s, -s, s - r);
+    shape.lineTo(-s, -s + r);
+    shape.quadraticCurveTo(-s, -s, -s + r, -s);
+
+    const extrudeSettings = {
+        depth: this.size.cubie,
+        bevelEnabled: true,
+        bevelSegments: 5,
+        steps: 1,
+        bevelSize: r,
+        bevelThickness: r,
+        curveSegments: 8
+    };
+
+    this.bodyGeometry =
+        new THREE.ExtrudeGeometry(shape, extrudeSettings);
+
+    this.bodyGeometry.center();
+    this.bodyGeometry.computeVertexNormals();
+
+    this.edgeGeometry =
+        new THREE.EdgesGeometry(this.bodyGeometry, 35);
+
+    // Rounded UV-coated sticker
+    const ss = this.size.sticker / 2;
+    const sr = this.size.stickerRadius;
+
+    const stickerShape = new THREE.Shape();
+
+    stickerShape.moveTo(-ss + sr, -ss);
+    stickerShape.lineTo(ss - sr, -ss);
+    stickerShape.quadraticCurveTo(ss, -ss, ss, -ss + sr);
+    stickerShape.lineTo(ss, ss - sr);
+    stickerShape.quadraticCurveTo(ss, ss, ss - sr, ss);
+    stickerShape.lineTo(-ss + sr, ss);
+    stickerShape.quadraticCurveTo(-ss, ss, -ss, ss - sr);
+    stickerShape.lineTo(-ss, -ss + sr);
+    stickerShape.quadraticCurveTo(-ss, -ss, -ss + sr, -ss);
+
+    this.stickerGeometry =
+    new THREE.ExtrudeGeometry(stickerShape, {
+        depth: 0.018,
+        bevelEnabled: true,
+        bevelThickness: 0.008,
+        bevelSize: 0.008,
+        bevelSegments: 3,
+        steps: 1,
+        curveSegments: 8
+    });
+
+this.stickerGeometry.center();
+this.stickerGeometry.computeVertexNormals();
 }  
 
-createSharedMaterials() {  
-    this.bodyMaterial = new THREE.MeshStandardMaterial({  
-        color: this.colors.BODY,  
-        roughness: 0.70,  
-        metalness: 0.10  
-    });  
+createSharedMaterials() {
 
-    this.edgeMaterial = new THREE.LineBasicMaterial({  
-        color: this.colors.EDGE  
-    });  
+    // Premium glossy black cube body
+    this.bodyMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0x080808,
+        roughness: 0.12,
+        metalness: 0.05,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.04,
+        reflectivity: 1.0,
+        ior: 1.5
+    });
 
-    // ஒவ்வொரு பக்கத்திற்கும் தேவையான மெட்டீரியல்களை கேச் செய்து மெமரியைச் சேமிக்கிறோம்  
-    this.stickerMaterials = {};  
-    const faces = ["U", "D", "L", "R", "F", "B"];  
-      
-    faces.forEach(face => {  
-        const color = this.colors[face];  
-        this.stickerMaterials[face] = new THREE.MeshStandardMaterial({  
-            color: color,  
-            roughness: 0.35,  
-            metalness: 0.05,  
-            emissive: color,  
-            emissiveIntensity: 0.18  
-        });  
-    });  
+    // Soft dark edges
+    this.edgeMaterial = new THREE.LineBasicMaterial({
+        color: 0x151515,
+        transparent: true,
+        opacity: 0.35
+    });
+
+    // Premium UV-coated stickers
+    this.stickerMaterials = {};
+
+    const faces = ["U", "D", "L", "R", "F", "B"];
+
+    faces.forEach(face => {
+
+        const color = this.colors[face];
+
+        this.stickerMaterials[face] =
+            new THREE.MeshPhysicalMaterial({
+                color: color,
+                roughness: 0.08,
+                metalness: 0.02,
+                clearcoat: 1.0,
+                clearcoatRoughness: 0.02,
+                reflectivity: 1.0,
+                ior: 1.5,
+                sheen: 0.15,
+                specularIntensity: 1.0,
+                specularColor: 0xffffff
+            });
+    });
 }  
 
 buildCube() {  
@@ -483,7 +593,10 @@ createStickerGeometry() {
 }  
 
 attachStickers(mesh, x, y, z) {  
-    const offset = this.size.cubie / 2 + this.size.stickerOffset;  
+    const offset =
+    (this.size.cubie / 2) +
+    this.size.cubieRadius +
+    this.size.stickerOffset;  
 
     if (x === 1) {  
         this.addSticker(  
