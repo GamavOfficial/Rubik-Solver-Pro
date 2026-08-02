@@ -301,17 +301,140 @@ const colorMap = {
     green: 0x00aa00
 };
 
+const stickerSize = cubieSize * 0.78;
+const stickerOffset = cubieSize / 2 + 0.082;
+
+const stickerGeometry = new THREE.PlaneGeometry(
+    stickerSize,
+    stickerSize
+);
+
+function createSticker(faceIndex) {
+    const material = new THREE.MeshStandardMaterial({
+        color: 0x222222,
+        roughness: 0.22,
+        metalness: 0.05,
+        side: THREE.DoubleSide
+    });
+
+    const sticker = new THREE.Mesh(stickerGeometry, material);
+
+    sticker.userData.isSticker = true;
+    sticker.userData.faceIndex = faceIndex;
+
+    switch (faceIndex) {
+
+        // Right
+        case 0:
+            sticker.position.x = stickerOffset;
+            sticker.rotation.y = Math.PI / 2;
+            break;
+
+        // Left
+        case 1:
+            sticker.position.x = -stickerOffset;
+            sticker.rotation.y = -Math.PI / 2;
+            break;
+
+        // Up
+        case 2:
+            sticker.position.y = stickerOffset;
+            sticker.rotation.x = -Math.PI / 2;
+            break;
+
+        // Down
+        case 3:
+            sticker.position.y = -stickerOffset;
+            sticker.rotation.x = Math.PI / 2;
+            break;
+
+        // Front
+        case 4:
+            sticker.position.z = stickerOffset;
+            break;
+
+        // Back
+        case 5:
+            sticker.position.z = -stickerOffset;
+            sticker.rotation.y = Math.PI;
+            break;
+    }
+
+    return sticker;
+}
+
+
 for (let x = -1; x <= 1; x++) {
     for (let y = -1; y <= 1; y++) {
         for (let z = -1; z <= 1; z++) {
-            const materials = Array(6).fill().map(() => new THREE.MeshStandardMaterial({ color: 0x222222 }));
-            const cubie = new THREE.Mesh(premiumCubieGeometry, materials);
-            cubie.position.set(x * (cubieSize + gap), y * (cubieSize + gap), z * (cubieSize + gap));
+
+            // Premium rounded black cubie body
+            const bodyMaterial = new THREE.MeshStandardMaterial({
+                color: 0x111111,
+                roughness: 0.18,
+                metalness: 0.08
+            });
+
+            const cubie = new THREE.Mesh(
+                premiumCubieGeometry,
+                bodyMaterial
+            );
+
+            cubie.position.set(
+                x * (cubieSize + gap),
+                y * (cubieSize + gap),
+                z * (cubieSize + gap)
+            );
 
             cubie.userData = {
-                x, y, z,
-                painted: [null, null, null, null, null, null] // 0:R, 1:L, 2:U, 3:D, 4:F, 5:B
+                x,
+                y,
+                z,
+                painted: [null, null, null, null, null, null],
+                stickers: []
             };
+
+            // R
+            if (x === 1) {
+                const sticker = createSticker(0);
+                cubie.add(sticker);
+                cubie.userData.stickers[0] = sticker;
+            }
+
+            // L
+            if (x === -1) {
+                const sticker = createSticker(1);
+                cubie.add(sticker);
+                cubie.userData.stickers[1] = sticker;
+            }
+
+            // U
+            if (y === 1) {
+                const sticker = createSticker(2);
+                cubie.add(sticker);
+                cubie.userData.stickers[2] = sticker;
+            }
+
+            // D
+            if (y === -1) {
+                const sticker = createSticker(3);
+                cubie.add(sticker);
+                cubie.userData.stickers[3] = sticker;
+            }
+
+            // F
+            if (z === 1) {
+                const sticker = createSticker(4);
+                cubie.add(sticker);
+                cubie.userData.stickers[4] = sticker;
+            }
+
+            // B
+            if (z === -1) {
+                const sticker = createSticker(5);
+                cubie.add(sticker);
+                cubie.userData.stickers[5] = sticker;
+            }
 
             rubiksCube.add(cubie);
         }
@@ -335,48 +458,126 @@ function onPointerDown(event) {
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
     raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(rubiksCube.children);
+    const intersects =
+    raycaster.intersectObjects(rubiksCube.children, true);
 
     if (intersects.length === 0) return;
 
     const hit = intersects[0];
-    const cubie = hit.object;
-    const faceIndex = Math.floor(hit.faceIndex / 2); // Local Material Index 0..5
 
-    const { x, y, z } = cubie.userData;
+// ------------------------------------------
+// Find clicked sticker / parent cubie
+// ------------------------------------------
+let sticker = null;
+let cubie = null;
+let faceIndex = null;
 
-    // Outer face protection
-    if (
-        (faceIndex === 0 && x !== 1) ||
-        (faceIndex === 1 && x !== -1) ||
-        (faceIndex === 2 && y !== 1) ||
-        (faceIndex === 3 && y !== -1) ||
-        (faceIndex === 4 && z !== 1) ||
-        (faceIndex === 5 && z !== -1)
-    ) {
+// Direct sticker hit
+if (hit.object.userData && hit.object.userData.isSticker) {
+    sticker = hit.object;
+    cubie = sticker.parent;
+    faceIndex = sticker.userData.faceIndex;
+}
+// Rounded cubie body hit
+else {
+    cubie = hit.object;
+
+    if (!cubie.userData || !cubie.userData.painted) {
         return;
     }
 
-    const previousColor = cubie.userData.painted[faceIndex];
+    // Convert hit normal into cubie's local direction
+    const normal = hit.face.normal.clone();
 
-    if (previousColor !== appState.selectedColor && colorUsage[appState.selectedColor] >= 9) {
-        showToast(appState.selectedColor + " limit reached (9/9)");
-        return;
+    const ax = Math.abs(normal.x);
+    const ay = Math.abs(normal.y);
+    const az = Math.abs(normal.z);
+
+    if (ax >= ay && ax >= az) {
+        faceIndex = normal.x > 0 ? 0 : 1;
+    } else if (ay >= ax && ay >= az) {
+        faceIndex = normal.y > 0 ? 2 : 3;
+    } else {
+        faceIndex = normal.z > 0 ? 4 : 5;
     }
 
-    if (previousColor === appState.selectedColor) return;
+    sticker = cubie.userData.stickers?.[faceIndex];
 
-    if (previousColor) colorUsage[previousColor]--;
+    // Internal/non-visible side
+    if (!sticker) {
+        return;
+    }
+}
 
-    cubie.userData.painted[faceIndex] = appState.selectedColor;
-    colorUsage[appState.selectedColor]++;
-    cubie.material[faceIndex].color.setHex(colorMap[appState.selectedColor]);
+if (!cubie || faceIndex === null || !sticker) {
+    return;
+}
 
-    updateFilledCounter();
-    updateValidateButton();
-    updateColorCounters();
+const { x, y, z } = cubie.userData;
 
-    showToast(appState.selectedColor + " Applied");
+// ------------------------------------------
+// Outer face protection
+// ------------------------------------------
+if (
+    (faceIndex === 0 && x !== 1) ||
+    (faceIndex === 1 && x !== -1) ||
+    (faceIndex === 2 && y !== 1) ||
+    (faceIndex === 3 && y !== -1) ||
+    (faceIndex === 4 && z !== 1) ||
+    (faceIndex === 5 && z !== -1)
+) {
+    return;
+}
+
+const previousColor =
+    cubie.userData.painted[faceIndex];
+
+// ------------------------------------------
+// Maximum 9 stickers per color
+// ------------------------------------------
+if (
+    previousColor !== appState.selectedColor &&
+    colorUsage[appState.selectedColor] >= 9
+) {
+    showToast(
+        appState.selectedColor +
+        " limit reached (9/9)"
+    );
+    return;
+}
+
+if (previousColor === appState.selectedColor) {
+    return;
+}
+
+// Remove old color count
+if (previousColor) {
+    colorUsage[previousColor]--;
+}
+
+// Save logical cube state
+cubie.userData.painted[faceIndex] =
+    appState.selectedColor;
+
+colorUsage[appState.selectedColor]++;
+
+// ------------------------------------------
+// Paint actual sticker mesh
+// ------------------------------------------
+sticker.material.color.setHex(
+    colorMap[appState.selectedColor]
+);
+
+sticker.material.needsUpdate = true;
+
+// Update UI
+updateFilledCounter();
+updateValidateButton();
+updateColorCounters();
+
+showToast(
+    appState.selectedColor + " Applied"
+);
 }
 
 function animate() {
