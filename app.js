@@ -301,59 +301,124 @@ const colorMap = {
     green: 0x00aa00
 };
 
-const stickerSize = cubieSize * 0.78;
-const stickerOffset = cubieSize / 2 + 0.082;
+/* ==========================================
+   PREMIUM UV COATED ROUNDED STICKERS
+========================================== */
 
-const stickerGeometry = new THREE.PlaneGeometry(
-    stickerSize,
-    stickerSize
-);
+const stickerSize = cubieSize * 0.80;
+const stickerOffset = cubieSize / 2 + 0.084;
 
+// Rounded-square sticker geometry
+function createRoundedStickerGeometry(size, radius = 0.105) {
+
+    const half = size / 2;
+    const shape = new THREE.Shape();
+
+    shape.moveTo(-half + radius, -half);
+
+    shape.lineTo(half - radius, -half);
+    shape.quadraticCurveTo(
+        half, -half,
+        half, -half + radius
+    );
+
+    shape.lineTo(half, half - radius);
+    shape.quadraticCurveTo(
+        half, half,
+        half - radius, half
+    );
+
+    shape.lineTo(-half + radius, half);
+    shape.quadraticCurveTo(
+        -half, half,
+        -half, half - radius
+    );
+
+    shape.lineTo(-half, -half + radius);
+    shape.quadraticCurveTo(
+        -half, -half,
+        -half + radius, -half
+    );
+
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.035,
+
+        bevelEnabled: true,
+        bevelThickness: 0.018,
+        bevelSize: 0.018,
+
+        bevelSegments: 5,
+        curveSegments: 10,
+        steps: 1
+    });
+
+    geometry.center();
+    geometry.computeVertexNormals();
+
+    return geometry;
+}
+
+const stickerGeometry =
+    createRoundedStickerGeometry(stickerSize);
+
+
+// Create individual UV sticker
 function createSticker(faceIndex) {
-    const material = new THREE.MeshStandardMaterial({
+
+    const material = new THREE.MeshPhysicalMaterial({
+
         color: 0x222222,
-        roughness: 0.22,
-        metalness: 0.05,
+
+        // UV coated glossy surface
+        roughness: 0.08,
+        metalness: 0.0,
+
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.035,
+
+        reflectivity: 1.0,
+
         side: THREE.DoubleSide
     });
 
-    const sticker = new THREE.Mesh(stickerGeometry, material);
+    const sticker =
+        new THREE.Mesh(stickerGeometry, material);
 
     sticker.userData.isSticker = true;
     sticker.userData.faceIndex = faceIndex;
 
     switch (faceIndex) {
 
-        // Right
+        // RIGHT
         case 0:
             sticker.position.x = stickerOffset;
             sticker.rotation.y = Math.PI / 2;
             break;
 
-        // Left
+        // LEFT
         case 1:
             sticker.position.x = -stickerOffset;
             sticker.rotation.y = -Math.PI / 2;
             break;
 
-        // Up
+        // UP
         case 2:
             sticker.position.y = stickerOffset;
             sticker.rotation.x = -Math.PI / 2;
             break;
 
-        // Down
+        // DOWN
         case 3:
             sticker.position.y = -stickerOffset;
             sticker.rotation.x = Math.PI / 2;
             break;
 
-        // Front
+        // FRONT
         case 4:
             sticker.position.z = stickerOffset;
             break;
 
-        // Back
+        // BACK
         case 5:
             sticker.position.z = -stickerOffset;
             sticker.rotation.y = Math.PI;
@@ -1124,3 +1189,4 @@ function rotateSlice(moveStr, callback) {
 
     requestAnimationFrame(animateTurn);
 }
+
