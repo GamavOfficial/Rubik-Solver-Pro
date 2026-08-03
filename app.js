@@ -231,7 +231,42 @@ if (solveBtn) {
 // Three.js Scene Setup
 const viewer = document.getElementById("viewer");
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x101826);
+/* ==========================================
+   PREMIUM CINEMATIC STUDIO BACKGROUND
+========================================== */
+
+const studioBackground = document.createElement("canvas");
+studioBackground.width = 1024;
+studioBackground.height = 1024;
+
+const bgCtx = studioBackground.getContext("2d");
+
+// Deep premium radial studio gradient
+const bgGradient = bgCtx.createRadialGradient(
+    512, 430, 40,
+    512, 512, 720
+);
+
+bgGradient.addColorStop(0.00, "#26364d");
+bgGradient.addColorStop(0.28, "#182638");
+bgGradient.addColorStop(0.62, "#0d1622");
+bgGradient.addColorStop(1.00, "#05080d");
+
+bgCtx.fillStyle = bgGradient;
+bgCtx.fillRect(
+    0,
+    0,
+    studioBackground.width,
+    studioBackground.height
+);
+
+const backgroundTexture =
+    new THREE.CanvasTexture(studioBackground);
+
+backgroundTexture.colorSpace =
+    THREE.SRGBColorSpace;
+
+scene.background = backgroundTexture;
 
 const camera = new THREE.PerspectiveCamera(35, viewer.clientWidth / viewer.clientHeight, 0.1, 1000);
 camera.position.set(0, 0, 8);
@@ -548,12 +583,23 @@ const premiumCubieGeometry =
     createRoundedCubieGeometry(cubieSize);
     
 const colorMap = {
-    white: 0xffffff,
-    yellow: 0xffff00,
-    red: 0xff0000,
-    orange: 0xff8800,
-    blue: 0x0000ff,
-    green: 0x00aa00
+    // Premium neutral white
+    white: 0xf7f7f4,
+
+    // Vivid speedcube yellow
+    yellow: 0xffe600,
+
+    // Deep rich red
+    red: 0xe61f2b,
+
+    // Bright fluorescent-style orange
+    orange: 0xff6a00,
+
+    // Rich electric blue
+    blue: 0x1261d8,
+
+    // Premium vivid green
+    green: 0x16a85a
 };
 
 /* ==========================================
@@ -788,6 +834,50 @@ const bodyMaterial = new THREE.MeshPhysicalMaterial({
         }
     }
 }
+
+/* ==========================================
+   PREMIUM STUDIO FLOOR + SOFT SHADOW
+========================================== */
+
+// Soft circular contact shadow texture
+const shadowCanvas = document.createElement("canvas");
+shadowCanvas.width = 512;
+shadowCanvas.height = 512;
+
+const shadowCtx = shadowCanvas.getContext("2d");
+
+const shadowGradient = shadowCtx.createRadialGradient(
+    256, 256, 20,
+    256, 256, 240
+);
+
+shadowGradient.addColorStop(0.00, "rgba(0,0,0,0.58)");
+shadowGradient.addColorStop(0.30, "rgba(0,0,0,0.38)");
+shadowGradient.addColorStop(0.65, "rgba(0,0,0,0.14)");
+shadowGradient.addColorStop(1.00, "rgba(0,0,0,0)");
+
+shadowCtx.fillStyle = shadowGradient;
+shadowCtx.fillRect(0, 0, 512, 512);
+
+const shadowTexture = new THREE.CanvasTexture(shadowCanvas);
+
+const contactShadow = new THREE.Mesh(
+    new THREE.PlaneGeometry(4.6, 4.6),
+    new THREE.MeshBasicMaterial({
+        map: shadowTexture,
+        transparent: true,
+        depthWrite: false,
+        opacity: 0.85
+    })
+);
+
+// Floor is horizontal
+contactShadow.rotation.x = -Math.PI / 2;
+
+// Cube bottom ≈ -1.475
+contactShadow.position.set(0, -1.53, 0);
+
+scene.add(contactShadow);
 
 scene.add(rubiksCube);
 const cubeRotation = new CubeRotation(rubiksCube);
