@@ -596,14 +596,14 @@ function createRoundedStickerGeometry(size, radius = 0.105) {
     );
 
     const geometry = new THREE.ExtrudeGeometry(shape, {
-        depth: 0.035,
+        depth: 0.042,
 
         bevelEnabled: true,
-        bevelThickness: 0.018,
-        bevelSize: 0.018,
+        bevelThickness: 0.022,
+        bevelSize: 0.022,
 
-        bevelSegments: 5,
-        curveSegments: 10,
+        bevelSegments: 8,
+        curveSegments: 16,
         steps: 1
     });
 
@@ -622,19 +622,31 @@ function createSticker(faceIndex) {
 
     const material = new THREE.MeshPhysicalMaterial({
 
-        color: 0x222222,
+    // Initial unpainted sticker
+    color: 0x181818,
 
-        // UV coated glossy surface
-        roughness: 0.08,
-        metalness: 0.0,
+    // Smooth polished sticker surface
+    roughness: 0.055,
+    metalness: 0.0,
 
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.035,
+    // Strong premium UV clear coating
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.018,
 
-        reflectivity: 1.0,
+    // Studio/HDR-style reflections
+    envMapIntensity: 1.75,
 
-        side: THREE.DoubleSide
-    });
+    // Dielectric glossy plastic
+    reflectivity: 0.85,
+    ior: 1.5,
+
+    // Preserve rich painted colors
+    sheen: 0.08,
+    sheenRoughness: 0.18,
+    sheenColor: new THREE.Color(0xffffff),
+
+    side: THREE.DoubleSide
+});
 
     const sticker =
         new THREE.Mesh(stickerGeometry, material);
